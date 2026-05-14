@@ -1,0 +1,15 @@
+{
+  "/api/invite-user/route": "app/api/invite-user/route.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/page": "app/page.js",
+  "/forgot-password/page": "app/forgot-password/page.js",
+  "/login/page": "app/login/page.js",
+  "/set-password/page": "app/set-password/page.js",
+  "/(protected)/admin/asociados/page": "app/(protected)/admin/asociados/page.js",
+  "/(protected)/admin/page": "app/(protected)/admin/page.js",
+  "/(protected)/usuario/perfil/page": "app/(protected)/usuario/perfil/page.js",
+  "/(protected)/usuario/page": "app/(protected)/usuario/page.js",
+  "/(protected)/admin/usuarios/page": "app/(protected)/admin/usuarios/page.js",
+  "/(protected)/admin/perfil/page": "app/(protected)/admin/perfil/page.js",
+  "/(protected)/usuario/bandeja/page": "app/(protected)/usuario/bandeja/page.js"
+}

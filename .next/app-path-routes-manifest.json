@@ -1,0 +1,15 @@
+{
+  "/api/invite-user/route": "/api/invite-user",
+  "/_not-found/page": "/_not-found",
+  "/page": "/",
+  "/forgot-password/page": "/forgot-password",
+  "/login/page": "/login",
+  "/set-password/page": "/set-password",
+  "/(protected)/admin/asociados/page": "/admin/asociados",
+  "/(protected)/admin/page": "/admin",
+  "/(protected)/usuario/perfil/page": "/usuario/perfil",
+  "/(protected)/usuario/page": "/usuario",
+  "/(protected)/admin/usuarios/page": "/admin/usuarios",
+  "/(protected)/admin/perfil/page": "/admin/perfil",
+  "/(protected)/usuario/bandeja/page": "/usuario/bandeja"
+}

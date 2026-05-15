@@ -1,6 +1,11 @@
 /**
- * Lee seed/admins.yml y crea los usuarios admin en Supabase Auth.
+ * Lee seed/admins.yml y crea los usuarios admin en Supabase Auth + profiles.
  * Usa el service role key — no necesita DATABASE_URL.
+ *
+ * También acepta un admin extra vía variables de entorno:
+ *   SEED_ADMIN_EMAIL    correo del admin extra
+ *   SEED_ADMIN_PASSWORD contraseña del admin extra
+ *   SEED_ADMIN_USERNAME nombre de usuario (opcional, se deriva del correo)
  *
  * Uso: npm run seed:admins
  */
@@ -36,16 +41,27 @@ async function main() {
     });
 
     const raw = readFileSync(resolve(process.cwd(), "seed/admins.yml"), "utf-8");
-    const { admins } = yaml.load(raw) as AdminsFile;
+    const { admins: yamlAdmins } = yaml.load(raw) as AdminsFile;
+    const admins: AdminEntry[] = [...(yamlAdmins ?? [])];
 
-    if (!admins?.length) {
-        console.log("No hay admins definidos en seed/admins.yml");
+    // Admin extra desde variables de entorno
+    const envEmail = process.env.SEED_ADMIN_EMAIL;
+    const envPassword = process.env.SEED_ADMIN_PASSWORD;
+    if (envEmail && envPassword) {
+        const envUsername = process.env.SEED_ADMIN_USERNAME || envEmail.split("@")[0];
+        admins.push({ email: envEmail, password: envPassword, username: envUsername });
+        console.log(`→ Admin extra desde env: ${envEmail}`);
+    }
+
+    if (!admins.length) {
+        console.log("No hay admins definidos en seed/admins.yml ni en variables de entorno.");
         return;
     }
 
     for (const admin of admins) {
-        console.log(`→ Creando admin: ${admin.email}`);
+        console.log(`→ Procesando admin: ${admin.email}`);
 
+        // 1. Crear/verificar usuario en Auth
         const { data, error } = await supabase.auth.admin.createUser({
             email: admin.email,
             password: admin.password,
@@ -53,16 +69,45 @@ async function main() {
             user_metadata: { username: admin.username },
         });
 
+        let userId: string | undefined;
+
         if (error) {
-            if (error.message.includes("already been registered")) {
-                console.log(`  ⚠ Ya existe: ${admin.email}`);
+            if (/already been registered/i.test(error.message)) {
+                console.log(`  ⚠ Auth ya existe: ${admin.email} — sincronizando perfil`);
+                // Recuperar el ID del usuario existente
+                const { data: listData } = await supabase.auth.admin.listUsers();
+                userId = listData?.users.find((u) => u.email === admin.email)?.id;
             } else {
-                console.error(`  ✗ Error: ${error.message}`);
+                console.error(`  ✗ Error Auth: ${error.message}`);
+                continue;
             }
+        } else {
+            userId = data.user?.id;
+            console.log(`  ✓ Auth creado: ${userId}`);
+        }
+
+        if (!userId) {
+            console.error(`  ✗ No se pudo obtener el ID para ${admin.email}`);
             continue;
         }
 
-        console.log(`  ✓ Creado: ${data.user?.id}`);
+        // 2. Upsert del perfil en la tabla profiles
+        const { error: profileError } = await supabase.from("profiles").upsert(
+            {
+                id: userId,
+                email: admin.email,
+                username: admin.username,
+                role: "admin",
+                estado: true,
+            },
+            { onConflict: "id" },
+        );
+
+        if (profileError) {
+            console.error(`  ✗ Error perfil: ${profileError.message}`);
+        } else {
+            console.log(`  ✓ Perfil sincronizado`);
+        }
     }
 
     console.log("\nSeed de admins completado.");

@@ -12,6 +12,8 @@ export interface InviteUserInput {
     email: string;
     /** Origen de la app (p.ej. "https://app.com" o "http://localhost:3000") */
     appOrigin: string;
+    /** Nombre de usuario; si se omite se deriva del prefijo del correo */
+    username?: string;
 }
 
 export interface InviteUserResult {
@@ -57,8 +59,6 @@ export async function inviteUser(
 
     if (error) {
         const msg = error.message || "";
-        // El SDK devuelve este error cuando el usuario ya existe y no se
-        // puede invitar de nuevo. Lo manejamos con un codigo amistoso.
         if (
             /already been registered/i.test(msg) ||
             /already exists/i.test(msg) ||
@@ -76,6 +76,23 @@ export async function inviteUser(
             code: "internal",
             message: msg || "Error generando el enlace de invitacion.",
         };
+    }
+
+    // Crear el perfil con estado=false hasta que el usuario establezca su contraseña.
+    const userId = data?.user?.id;
+    if (userId) {
+        const username = (input.username?.trim() || email.split("@")[0]).toLowerCase();
+        const { error: profileError } = await admin.from("profiles").upsert(
+            { id: userId, email, username, role: "user", estado: false },
+            { onConflict: "id" },
+        );
+        if (profileError) {
+            return {
+                ok: false,
+                code: "internal",
+                message: "Invitacion enviada pero no se pudo crear el perfil: " + profileError.message,
+            };
+        }
     }
 
     return {

@@ -35,6 +35,7 @@ export default function AdminUsuariosPage() {
     // Modal estado
     const [modalOpen, setModalOpen] = useState(false);
     const [inviteEmail, setInviteEmail] = useState("");
+    const [inviteUsername, setInviteUsername] = useState("");
     const [inviting, setInviting] = useState(false);
     const [inviteStatus, setInviteStatus] = useState<{
         ok: boolean;
@@ -116,8 +117,7 @@ export default function AdminUsuariosPage() {
                 },
                 body: JSON.stringify({
                     email: inviteEmail,
-                    role: "user",
-                    estado: true,
+                    username: inviteUsername.trim() || undefined,
                 }),
             });
 
@@ -137,6 +137,7 @@ export default function AdminUsuariosPage() {
             });
 
             setInviteEmail("");
+            setInviteUsername("");
 
             setTimeout(() => {
                 fetchUsers();
@@ -204,6 +205,8 @@ export default function AdminUsuariosPage() {
                         onClick={() => {
                             setModalOpen(true);
                             setInviteStatus(null);
+                            setInviteEmail("");
+                            setInviteUsername("");
                         }}
                         className="rounded-none bg-[#012340] hover:bg-[#012340]/90 text-white h-10 px-4 text-xs font-bold tracking-widest"
                     >
@@ -355,6 +358,19 @@ export default function AdminUsuariosPage() {
                                     value={inviteEmail}
                                     onChange={(e) => setInviteEmail(e.target.value)}
                                     required
+                                    className="rounded-none border-[#0D0D0D]/20 focus-visible:border-[#012340] focus-visible:ring-0"
+                                />
+                            </div>
+
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-xs font-semibold text-[#0D0D0D]/60 uppercase tracking-wider">
+                                    Nombre de usuario <span className="font-normal normal-case">(opcional)</span>
+                                </label>
+                                <Input
+                                    type="text"
+                                    placeholder="Se deriva del correo si se deja vacío"
+                                    value={inviteUsername}
+                                    onChange={(e) => setInviteUsername(e.target.value)}
                                     className="rounded-none border-[#0D0D0D]/20 focus-visible:border-[#012340] focus-visible:ring-0"
                                 />
                             </div>

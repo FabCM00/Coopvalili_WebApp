@@ -1,3 +1,10 @@
+# Admins base del sistema.
+# Para agregar un admin extra sin toccar este archivo, define en .env.local:
+#   SEED_ADMIN_EMAIL=administrador@fvl.org.co
+#   SEED_ADMIN_PASSWORD=coopvalili
+#   SEED_ADMIN_USERNAME=administrador   (opcional)
+# Luego ejecuta: npm run seed:admins
+
 admins:
   - email: hcardoso@wantnget.com.co
     username: hcardoso

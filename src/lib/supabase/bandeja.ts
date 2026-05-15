@@ -116,6 +116,9 @@ export interface MotorProcessResultRow {
     capacidad_pago_b3: number | null;
     monto_credito_b3: number | null;
     raw_json: Record<string, any> | null;
+    cuota_b1 : number | null;
+    cuota_b2 : number | null;
+    cuota_b3 : number | null;
     created_at: string;
 }
 
@@ -169,6 +172,12 @@ export interface IdentityValidationRow {
     created_at: string;
 }
 
+export interface CreditoDecisionRow {
+    radicado: string;
+    opcion_elegida: string;
+    response: Record<string, any> | null;
+    created_at: string;
+}
 // ─── Tipos UI ─────────────────────────────────────────────────────────────────
 
 export type SolicitudEstado =
@@ -210,6 +219,7 @@ export interface SolicitudUI {
         motor_process: MotorProcessResultRow | null;
         motor_data: MotorDataResultRow | null;
         identity_validation: IdentityValidationRow | null;
+        credito_decision: CreditoDecisionRow | null;
     };
 }
 
@@ -391,7 +401,7 @@ export async function listSolicitudes(
             const radicados = v1Rows.map((r) => r.radicado);
 
             // 2) En paralelo: motor_process_results, motor_data_results, identity_validations
-            const [mpRes, mdRes, ivRes] = await Promise.all([
+            const [mpRes, mdRes, ivRes, cdRes] = await Promise.all([
                 supabase
                     .from("motor_process_results")
                     .select("*")
@@ -404,13 +414,16 @@ export async function listSolicitudes(
                     .from("identity_validations")
                     .select("*")
                     .in("radicado_valida1", radicados),
+                supabase
+                    .from("credito_decisiones")
+                    .select("*")
+                    .in("radicado", radicados),
             ]);
 
             const mpRows = (mpRes.data ?? []) as MotorProcessResultRow[];
             const mdRows = (mdRes.data ?? []) as MotorDataResultRow[];
-            const ivRows = ivRes.error
-                ? []
-                : ((ivRes.data ?? []) as IdentityValidationRow[]);
+            const ivRows = ivRes.error ? [] : ((ivRes.data ?? []) as IdentityValidationRow[]);
+            const cdRows = cdRes.error ? [] : ((cdRes.data ?? []) as CreditoDecisionRow[]);
 
             if (mpRes.error)
                 console.warn("[bandeja] motor_process_results:", mpRes.error.message);
@@ -418,6 +431,8 @@ export async function listSolicitudes(
                 console.warn("[bandeja] motor_data_results:", mdRes.error.message);
             if (ivRes.error)
                 console.warn("[bandeja] identity_validations:", ivRes.error.message);
+            if (cdRes.error)
+                console.warn("[bandeja] credito_decisiones:", cdRes.error.message);
 
             // Indexar por radicado (usando radicado_valida1 para motor_data e identity)
             const mpByRad = new Map<string, MotorProcessResultRow>();
@@ -432,6 +447,9 @@ export async function listSolicitudes(
             for (const r of ivRows) {
                 if (r.radicado_valida1) ivByRad.set(r.radicado_valida1, r);
             }
+
+            const cdByRad = new Map<string, CreditoDecisionRow>();
+            for (const r of cdRows) cdByRad.set(r.radicado, r);
 
             const out: SolicitudUI[] = v1Rows.map((v1) => {
                 const motor = mpByRad.get(v1.radicado) ?? null;
@@ -462,6 +480,7 @@ export async function listSolicitudes(
                         motor_process: motor,
                         motor_data: md,
                         identity_validation: iv,
+                        credito_decision: cdByRad.get(v1.radicado) ?? null,
                     },
                 };
             });

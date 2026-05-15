@@ -31,7 +31,7 @@ export function useProtectedRoute({ allowedRoles }: UseProtectedRouteOptions = {
 
         wasAuthenticatedRef.current = true;
 
-        if (user && !profile) {
+        if (!profile) {
             refreshProfile();
             return;
         }

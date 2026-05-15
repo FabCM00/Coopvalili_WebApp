@@ -136,15 +136,19 @@ function CriteriaSummary({ values }: { values: (number | null | undefined)[] }) 
     );
 }
 
+function normBool(v: number | null | undefined): 1 | 2 | null {
+    if (v === 1) return 1;
+    if (v === 0) return 2;
+    return null;
+}
+
 export function ResumenSolicitud({ solicitud }: { solicitud: SolicitudUI }) {
     const v1 = solicitud.raw.valida1;
     const mp = solicitud.raw.motor_process;
     const md = solicitud.raw.motor_data;
-
-    const criteriosVisibles = [
-        v1.valida_activo, v1.valida_edad, v1.valida_asociado, v1.valida_no_retirado,
-        ...(mp ? [mp.cumple_end, mp.cumple_sol, mp.cumple_disp, mp.cumple_des, mp.cumplimiento_4_criterios] : [])
-    ];
+    const iv = solicitud.raw.identity_validation;
+    const cd = solicitud.raw.credito_decision;
+    const opcionElegidaId = cd?.opcion_elegida === "B1" ? 1 : cd?.opcion_elegida === "B2" ? 2 : cd?.opcion_elegida === "B3" ? 3 : null;
 
     return (
         <div className="p-4 flex flex-col gap-5">
@@ -195,30 +199,38 @@ export function ResumenSolicitud({ solicitud }: { solicitud: SolicitudUI }) {
                     </p>
                     <div className="grid grid-cols-3 gap-3">
                         {[
-                            { id: 1, cumple: mp.cumple_4_criterios_b1, monto: mp.monto_credito_b1, cap: mp.capacidad_pago_b1 },
-                            { id: 2, cumple: mp.cumple_4_criterios_b2, monto: mp.monto_credito_b2, cap: mp.capacidad_pago_b2 },
-                            { id: 3, cumple: mp.cumple_4_criterios_b3, monto: mp.monto_credito_b3, cap: mp.capacidad_pago_b3 },
+                            { id: 1, cumple: mp.cumple_4_criterios_b1, monto: mp.monto_credito_b1, cap: mp.cuota_b1 },
+                            { id: 2, cumple: mp.cumple_4_criterios_b2, monto: mp.monto_credito_b2, cap: mp.cuota_b2 },
+                            { id: 3, cumple: mp.cumple_4_criterios_b3, monto: mp.monto_credito_b3, cap: mp.cuota_b3 },
                         ]
                             .filter((opt) => opt.monto != null || opt.cap != null || opt.cumple != null)
                             .map((opt) => {
                                 const isViable = opt.cumple === 1;
+                                const isElegida = opt.id === opcionElegidaId;
                                 return (
-                                    <div key={opt.id} className={`flex flex-col border rounded-sm overflow-hidden ${isViable ? "border-green-200 bg-green-50/30" : "border-[#0D0D0D]/10 bg-[#0D0D0D]/[0.02] opacity-80"}`}>
-                                        <div className={`flex flex-wrap gap-1 items-center justify-between px-3 py-2 border-b ${isViable ? "bg-green-100/50 border-green-200" : "bg-[#0D0D0D]/[0.04] border-[#0D0D0D]/10"}`}>
-                                            <span className={`text-[11px] font-bold ${isViable ? "text-green-800" : "text-[#0D0D0D]/50"}`}>
+                                    <div key={opt.id} className={`flex flex-col border rounded-sm overflow-hidden ${isElegida ? "border-[#012340] ring-1 ring-[#012340]/30" : isViable ? "border-green-200 bg-green-50/30" : "border-[#0D0D0D]/10 bg-[#0D0D0D]/[0.02] opacity-80"}`}>
+                                        <div className={`flex flex-wrap gap-1 items-center justify-between px-3 py-2 border-b ${isElegida ? "bg-[#012340] border-[#012340]" : isViable ? "bg-green-100/50 border-green-200" : "bg-[#0D0D0D]/[0.04] border-[#0D0D0D]/10"}`}>
+                                            <span className={`text-[11px] font-bold ${isElegida ? "text-white" : isViable ? "text-green-800" : "text-[#0D0D0D]/50"}`}>
                                                 Opción {opt.id}
                                             </span>
-                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wide ${isViable ? "bg-green-500 text-white" : "bg-[#0D0D0D]/15 text-[#0D0D0D]/60"}`}>
-                                                {isViable ? "Viable" : "No viable"}
-                                            </span>
+                                            <div className="flex items-center gap-1">
+                                                {isElegida && (
+                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wide bg-white/25 text-white">
+                                                        Elegida
+                                                    </span>
+                                                )}
+                                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wide ${isElegida ? "bg-white/15 text-white/80" : isViable ? "bg-green-500 text-white" : "bg-[#0D0D0D]/15 text-[#0D0D0D]/60"}`}>
+                                                    {isViable ? "Viable" : "No viable"}
+                                                </span>
+                                            </div>
                                         </div>
                                         <div className="flex flex-col gap-2 p-3">
                                             <div>
                                                 <p className="text-[10px] text-[#0D0D0D]/40 mb-0.5">Monto Crédito</p>
-                                                <p className={`text-sm font-bold truncate ${isViable ? "text-green-900" : "text-[#0D0D0D]/70"}`}>{fmt(opt.monto)}</p>
+                                                <p className={`text-sm font-bold truncate ${isElegida ? "text-[#012340]" : isViable ? "text-green-900" : "text-[#0D0D0D]/70"}`}>{fmt(opt.monto)}</p>
                                             </div>
                                             <div>
-                                                <p className="text-[10px] text-[#0D0D0D]/40 mb-0.5">Capacidad Pago</p>
+                                                <p className="text-[10px] text-[#0D0D0D]/40 mb-0.5">Cuota</p>
                                                 <p className="text-xs font-medium text-[#0D0D0D]/70 truncate">{fmt(opt.cap)}</p>
                                             </div>
                                         </div>
@@ -226,42 +238,72 @@ export function ResumenSolicitud({ solicitud }: { solicitud: SolicitudUI }) {
                                 );
                             })}
                     </div>
+                    {cd && (
+                        <div className="flex items-center gap-2 mt-3 px-3 py-2.5 bg-[#012340]/[0.04] border border-[#012340]/15">
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-[#012340]/50">Opción elegida por el usuario</span>
+                            <span className="text-[11px] font-bold text-[#012340] font-mono">{cd.opcion_elegida}</span>
+                            <span className="ml-auto text-[10px] text-[#0D0D0D]/35 font-mono">{cd.created_at.slice(0, 10)}</span>
+                        </div>
+                    )}
                 </div>
             )}
 
-            <Section title="Criterios de decisión">
-                <CriteriaSummary values={criteriosVisibles} />
-                <CriterioRow label="Resultado Validación 1" value={v1.valida1} />
-                <CriterioRow label="Validación Activo" value={v1.valida_activo} />
+            {/* ── Valida 1 ─────────────────────────────────────────── */}
+            <Section title="Valida 1 — Criterios del cliente">
+                <CriteriaSummary values={[v1.valida1, v1.valida_edad, v1.valida_activo, v1.valida_asociado, v1.valida_no_retirado]} />
+                <CriterioRow label="Valida 1 (Inicial)" value={v1.valida1} />
                 <CriterioRow label="Validación Edad" value={v1.valida_edad} />
+                <CriterioRow label="Validación Activo" value={v1.valida_activo} />
                 <CriterioRow label="Validación Asociado" value={v1.valida_asociado} />
                 <CriterioRow label="Validación No Retirado" value={v1.valida_no_retirado} />
-                
-                {mp && (
+            </Section>
+
+            {/* ── Identidad ─────────────────────────────────────────── */}
+            <Section title="Identidad — Validación documental y facial">
+                {iv ? (
                     <>
+                        <CriteriaSummary values={[normBool(iv.status_document), normBool(iv.status_face), normBool(iv.estado_validacion)]} />
+                        <CriterioRow label="Estado Documento" value={normBool(iv.status_document)} />
+                        <CriterioRow label="Estado Facial" value={normBool(iv.status_face)} />
+                        <CriterioRow label="Estado General" value={normBool(iv.estado_validacion)} />
+                    </>
+                ) : (
+                    <p className="px-4 py-3 text-xs text-[#0D0D0D]/30 italic">Sin datos de validación de identidad.</p>
+                )}
+            </Section>
+
+            {/* ── Motor de crédito ──────────────────────────────────── */}
+            <Section title="Motor de crédito — Política de crédito">
+                {mp ? (
+                    <>
+                        <CriteriaSummary values={[mp.cumple_end, mp.cumple_sol, mp.cumple_disp, mp.cumple_des, mp.cumplimiento_4_criterios]} />
                         <CriterioRow label="Cumple Endeudamiento" value={mp.cumple_end} />
                         <CriterioRow label="Cumple Solvencia" value={mp.cumple_sol} />
                         <CriterioRow label="Cumple Disponible" value={mp.cumple_disp} />
                         <CriterioRow label="Cumple Desprotegido" value={mp.cumple_des} />
                         <CriterioRow label="Cumplimiento 4 Criterios" value={mp.cumplimiento_4_criterios} />
                     </>
+                ) : (
+                    <p className="px-4 py-3 text-xs text-[#0D0D0D]/30 italic">No se ha procesado el motor para esta solicitud.</p>
                 )}
             </Section>
 
-            {v1.mensaje && (
-                <Section title="Mensaje Validación Inicial">
-                    <div className={`px-4 py-3 ${v1.valida1 === 1 ? "bg-green-50" : "bg-red-50"}`}>
-                        <p className={`flex items-start gap-2 text-xs leading-relaxed ${v1.valida1 === 1 ? "text-green-700" : "text-red-700"}`}>
-                            {v1.valida1 === 1 ? (
-                                <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
-                            ) : (
-                                <AlertTriangle className="h-4 w-4 text-red-400 flex-shrink-0 mt-0.5" />
-                            )}
-                            {v1.mensaje}
-                        </p>
+            {/* ── Servicio externo ──────────────────────────────────── */}
+            <Section title="Servicio externo — CoproCenva">
+                <p className="px-4 py-3 text-xs text-[#0D0D0D]/30 italic">Sin datos de envío a CoproCenva.</p>
+            </Section>
+
+            {/* ── Motivos no apto ───────────────────────────────────── */}
+            <Section title="Motivos no apto">
+                {v1.mensaje && v1.valida1 !== 1 ? (
+                    <div className="flex items-start gap-2.5 px-4 py-3 bg-red-50">
+                        <AlertTriangle className="h-4 w-4 text-red-400 flex-shrink-0 mt-0.5" />
+                        <p className="text-xs text-red-700 leading-relaxed">{v1.mensaje}</p>
                     </div>
-                </Section>
-            )}
+                ) : (
+                    <p className="px-4 py-3 text-xs text-[#0D0D0D]/30 italic">Sin motivos de rechazo registrados.</p>
+                )}
+            </Section>
         </div>
     );
 }
@@ -293,8 +335,8 @@ export function JsonView({ data }: JsonViewProps) {
                 }
             `}</style>
             <div className="flex-1 min-h-[300px] overflow-hidden">
-                <Editor 
-                
+                <Editor
+
                     height="100%"
                     language="json"
                     value={formatted}
@@ -372,6 +414,11 @@ function buildAuditoriaResumen(solicitud: SolicitudUI): Record<string, any> {
             solvencia: mp.solvencia,
             disponible: mp.disponible,
             desprotegido: mp.desprotegido,
+        } : null,
+        decision_usuario: solicitud.raw.credito_decision ? {
+            opcion_elegida: solicitud.raw.credito_decision.opcion_elegida,
+            registrado_en: solicitud.raw.credito_decision.created_at,
+            response: solicitud.raw.credito_decision.response ?? null,
         } : null,
     };
 }

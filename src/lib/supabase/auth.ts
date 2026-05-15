@@ -41,25 +41,6 @@ export async function signIn(
     );
 }
 
-export async function signUp(
-    email: string,
-    password: string,
-    username: string,
-): Promise<SafeResult<{ user: User | null; session: Session | null }>> {
-    return safeCall(
-        async () => {
-            const { data, error } = await supabase.auth.signUp({
-                email,
-                password,
-                options: { data: { username } },
-            });
-            if (error) return { data: null, error };
-            return { data, error: null };
-        },
-        { label: "auth.signUp" },
-    );
-}
-
 export async function signOut(
     scope: "global" | "local" | "others" = "local",
 ): Promise<SafeResult<true>> {

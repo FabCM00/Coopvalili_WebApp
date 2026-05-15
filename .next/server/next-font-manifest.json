@@ -1,1 +1,35 @@
-{"pages":{},"app":{},"appUsingSizeAdjust":false,"pagesUsingSizeAdjust":false}
+{
+  "app": {
+    "[project]/src/app/(protected)/admin/asociados/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.479bea2b.woff2"
+    ],
+    "[project]/src/app/(protected)/admin/perfil/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.479bea2b.woff2"
+    ],
+    "[project]/src/app/(protected)/admin/usuarios/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.479bea2b.woff2"
+    ],
+    "[project]/src/app/(protected)/usuario/bandeja/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.479bea2b.woff2"
+    ],
+    "[project]/src/app/forgot-password/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.479bea2b.woff2"
+    ],
+    "[project]/src/app/login/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.479bea2b.woff2"
+    ],
+    "[project]/src/app/set-password/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.479bea2b.woff2"
+    ]
+  },
+  "appUsingSizeAdjust": true,
+  "pages": {},
+  "pagesUsingSizeAdjust": false
+}

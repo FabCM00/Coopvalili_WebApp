@@ -97,12 +97,17 @@ export async function POST(req: NextRequest) {
         );
     }
 
+    const username: string | undefined =
+        typeof body?.username === "string" && body.username.trim()
+            ? body.username.trim()
+            : undefined;
+
     const origin =
         process.env.NEXT_PUBLIC_APP_URL ||
         req.headers.get("origin") ||
         "http://localhost:3000";
 
-    const result = await inviteUser({ email, appOrigin: origin });
+    const result = await inviteUser({ email, username, appOrigin: origin });
 
     const status = result.ok
         ? 200

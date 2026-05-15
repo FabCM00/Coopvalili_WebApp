@@ -1,4 +1,4 @@
-import { Database, DatabaseBackup, Inbox, LayoutDashboard, User, Users, type LucideIcon } from "lucide-react";
+import { ClipboardList, Database, Inbox, User, Users, type LucideIcon } from "lucide-react";
 
 export interface NavItem {
     label: string;

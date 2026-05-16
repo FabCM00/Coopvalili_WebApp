@@ -123,10 +123,11 @@ export default function SetPasswordPage() {
                 title="¡Contraseña creada!"
                 body="Tu acceso está listo. Serás redirigido al inicio de sesión en un momento."
             >
-                <div className="flex items-center justify-center gap-2 text-sm text-[#0D0D0D]/40">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Redirigiendo...
-                </div>
+                <Button onClick={() => router.replace("/login")} variant="outline"
+                    className="flex h-12 w-full items-center justify-center rounded-[10px] bg-[#F29A2E] text-base font-semibold text-[#0D0D0D] shadow-sm transition hover:bg-[#F28A2E]2">
+                    <ArrowLeft className="h-4 w-4" />
+                    Volver al login
+                </Button>
             </AuthIllustrationPage>
         );
     }
@@ -138,11 +139,11 @@ export default function SetPasswordPage() {
                 imageAlt="Enlace inválido"
                 title="Invitación inválida"
                 body="Parece que este enlace no es válido o ha expirado. Solicita una nueva invitación para continuar."
-            >   
+            >
                 <Button onClick={() => router.replace("/login")} variant="outline"
-                    className="h-12 w-full rounded-[10px] border-[#F29A2E] text-[#F29A2E] text-base font-semibold hover:bg-[#F29A2E]/8 gap-2">
+                    className="flex h-12 w-full items-center justify-center rounded-[10px] bg-[#F29A2E] text-base font-semibold text-[#0D0D0D] shadow-sm transition hover:bg-[#F28A2E]">
                     <ArrowLeft className="h-4 w-4" />
-                    Volver al login
+                    Volver al inicio de sesión
                 </Button>
             </AuthIllustrationPage>
         );

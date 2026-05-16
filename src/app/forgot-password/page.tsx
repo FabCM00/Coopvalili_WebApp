@@ -29,7 +29,23 @@ export default function ForgotPasswordPage() {
         if (!email) { setErrorMsg("El correo es obligatorio."); return; }
 
         setLoading(true);
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+
+        // 1. Validar que el correo existe en la base de datos antes de enviar
+        const validation = await fetch("/api/reset-password", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: email.trim().toLowerCase() }),
+        });
+
+        if (!validation.ok) {
+            const body = await validation.json().catch(() => ({}));
+            setErrorMsg(body?.message || "No encontramos una cuenta con ese correo.");
+            setLoading(false);
+            return;
+        }
+
+        // 2. Correo válido — enviar enlace de recuperación
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
         const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
             redirectTo: `${baseUrl.replace(/\/$/, "")}/set-password`,
         });

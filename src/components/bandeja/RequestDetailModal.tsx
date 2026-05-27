@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { type SolicitudUI } from "@/lib/supabase";
+import { type SolicitudUI } from "@/lib/types";
 import { ModalHeader, ModalTabs, type DetailModalTab } from "./ModalHeader";
 import { MotorJsonView, ResumenSolicitud } from "./DetailContent";
 

@@ -1,60 +1,60 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/contexts/AuthContext";
+import { useSession } from "next-auth/react";
+import type { Profile } from "@/contexts/AuthContext";
 
 type Role = "admin" | "user";
 
 interface UseProtectedRouteOptions {
-    allowedRoles?: Role[];
+  allowedRoles?: Role[];
 }
 
-export function useProtectedRoute({ allowedRoles }: UseProtectedRouteOptions = {}) {
-    const { user, profile, loading, error, refreshProfile, isLoggingOut } = useAuth();
-    const router = useRouter();
-    const wasAuthenticatedRef = useRef(false);
+function mapToProfile(user: {
+  id?: string;
+  email?: string | null;
+  name?: string | null;
+  role?: string;
+}): Profile {
+  return {
+    id: user.id ?? "",
+    email: user.email ?? "",
+    username: user.name ?? (user.email?.split("@")[0] ?? ""),
+    role: (user.role === "admin" ? "admin" : "user") as Role,
+    estado: true,
+    created_at: "",
+  };
+}
 
-    useEffect(() => {
-        if (loading) return;
+export function useProtectedRoute({
+  allowedRoles,
+}: UseProtectedRouteOptions = {}) {
+  const { data: session, status } = useSession();
+  const router = useRouter();
 
-        if (!user) {
-            const expired = wasAuthenticatedRef.current && !isLoggingOut;
-            router.push(expired ? "/login?session=expired" : "/login");
-            return;
-        }
+  const loading = status === "loading";
+  const user = session?.user ?? null;
+  const role = user?.role as Role | undefined;
+  const profile = user ? mapToProfile(user) : null;
 
-        if (error) {
-            router.push("/login");
-            return;
-        }
+  useEffect(() => {
+    if (loading) return;
 
-        wasAuthenticatedRef.current = true;
+    if (!user) {
+      router.push("/login");
+      return;
+    }
 
-        if (!profile) {
-            refreshProfile();
-            return;
-        }
+    if (allowedRoles && role && !allowedRoles.includes(role)) {
+      router.push(role === "admin" ? "/admin/usuarios" : "/usuario/bandeja");
+    }
+  }, [user, role, loading, allowedRoles, router]);
 
-        if (profile && profile.estado !== true) {
-            router.push("/login");
-            return;
-        }
+  const isAuthorized =
+    !loading &&
+    !!user &&
+    (!allowedRoles || (role !== undefined && allowedRoles.includes(role)));
 
-        if (allowedRoles && profile && !allowedRoles.includes(profile.role)) {
-            if (profile.role === "admin") {
-                router.push("/admin/usuarios");
-            } else {
-                router.push("/usuario/bandeja");
-            }
-        }
-    }, [user, profile, loading, allowedRoles, router, refreshProfile, error]);
-
-    const isAuthorized =
-        !loading &&
-        !!user &&
-        !!profile &&
-        (!allowedRoles || allowedRoles.includes(profile.role));
-
-    return { user, profile, loading, isAuthorized };
+  return { user, profile, loading, isAuthorized };
 }

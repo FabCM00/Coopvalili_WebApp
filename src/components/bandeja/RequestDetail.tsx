@@ -1,6 +1,6 @@
 "use client";
 
-import { type SolicitudUI } from "@/lib/supabase";
+import { type SolicitudUI } from "@/lib/types";
 import { type DetailModalTab } from "./ModalHeader";
 import { ModalHeader } from "./ModalHeader";
 import { MotorJsonView, ResumenSolicitud } from "./DetailContent";

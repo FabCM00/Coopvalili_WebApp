@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { bandeja } from "@/lib/supabase";
-import type { SolicitudUI, SolicitudEstado } from "@/lib/supabase";
+import type { SolicitudUI, SolicitudEstado } from "@/lib/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -80,17 +79,29 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
     const PAGE_SIZE = 20;
 
     const fetchData = useCallback(async (clearSelection = false) => {
-        const r = await bandeja.listSolicitudes({ limit: 200, cedulaFilter });
-        if (!r.ok) { setError(r.error.message); setSolicitudes([]); return; }
-        setError(null);
-        setSolicitudes(r.data);
-        if (clearSelection) {
-            setSelectedRadicado(null);
-        } else {
-            setSelectedRadicado((cur) => {
-                if (cur && r.data.some((s) => s.radicado === cur)) return cur;
-                return null;
-            });
+        const prefix = process.env.NEXT_PUBLIC_URL_PREFIX || "";
+        const url = `${prefix}/api/usuario/bandeja?limit=200${cedulaFilter ? `&cedulaFilter=${cedulaFilter}` : ""}`;
+        try {
+            const res = await fetch(url);
+            const r = await res.json();
+            if (!res.ok || !r.ok) {
+                setError(r.message || "Error al cargar solicitudes");
+                setSolicitudes([]);
+                return;
+            }
+            setError(null);
+            setSolicitudes(r.data);
+            if (clearSelection) {
+                setSelectedRadicado(null);
+            } else {
+                setSelectedRadicado((cur) => {
+                    if (cur && r.data.some((s: any) => s.radicado === cur)) return cur;
+                    return null;
+                });
+            }
+        } catch (err: any) {
+            setError(err?.message || "Error de red al cargar solicitudes");
+            setSolicitudes([]);
         }
     }, [cedulaFilter]);
 
@@ -106,11 +117,26 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
     const handleConfirmGestionar = async () => {
         if (!confirmRadicado) return;
         setGestionando(true);
-        const r = await bandeja.marcarGestionado(confirmRadicado, user?.email ?? undefined);
-        setGestionando(false);
-        setConfirmRadicado(null);
-        if (!r.ok) { setError(`Error al gestionar: ${r.error.message}`); return; }
-        await fetchData(true);
+        try {
+            const prefix = process.env.NEXT_PUBLIC_URL_PREFIX || "";
+            const res = await fetch(`${prefix}/api/usuario/bandeja`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ radicado: confirmRadicado }),
+            });
+            const r = await res.json();
+            setGestionando(false);
+            setConfirmRadicado(null);
+            if (!res.ok || !r.ok) {
+                setError(`Error al gestionar: ${r.message || "Error de red"}`);
+                return;
+            }
+            await fetchData(true);
+        } catch (err: any) {
+            setGestionando(false);
+            setConfirmRadicado(null);
+            setError(`Error al gestionar: ${err.message || "Error de red"}`);
+        }
     };
 
     const totalActivas = useMemo(() => solicitudes.filter((s) => !s.gestionado).length, [solicitudes]);

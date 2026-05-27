@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useMemo, type ReactNode } from "react";
 import Editor from "@monaco-editor/react";
-import { type SolicitudUI } from "@/lib/supabase";
+import { type SolicitudUI } from "@/lib/types";
 import {
     AlertTriangle,
     CheckCircle2,
@@ -136,9 +136,9 @@ function CriteriaSummary({ values }: { values: (number | null | undefined)[] }) 
     );
 }
 
-function normBool(v: number | null | undefined): 1 | 2 | null {
-    if (v === 1) return 1;
-    if (v === 0) return 2;
+function normBool(v: string | number | null | undefined): 1 | 2 | null {
+    if (v === 1 || v === "1" || String(v).toLowerCase() === "true" || String(v).toLowerCase() === "aprobado" || String(v).toLowerCase() === "success") return 1;
+    if (v === 0 || v === "0" || String(v).toLowerCase() === "false" || String(v).toLowerCase() === "rechazado" || String(v).toLowerCase() === "failed") return 2;
     return null;
 }
 
@@ -205,7 +205,7 @@ export function ResumenSolicitud({ solicitud }: { solicitud: SolicitudUI }) {
                         ]
                             .filter((opt) => opt.monto != null || opt.cap != null || opt.cumple != null)
                             .map((opt) => {
-                                const isViable = opt.cumple === 1;
+                                const isViable = opt.cumple === 1 || opt.cumple === "1" || Number(opt.cumple) === 1;
                                 const isElegida = opt.id === opcionElegidaId;
                                 return (
                                     <div key={opt.id} className={`flex flex-col border rounded-sm overflow-hidden ${isElegida ? "border-[#012340] ring-1 ring-[#012340]/30" : isViable ? "border-green-200 bg-green-50/30" : "border-[#0D0D0D]/10 bg-[#0D0D0D]/[0.02] opacity-80"}`}>
@@ -276,12 +276,12 @@ export function ResumenSolicitud({ solicitud }: { solicitud: SolicitudUI }) {
             <Section title="Motor de crédito — Política de crédito">
                 {mp ? (
                     <>
-                        <CriteriaSummary values={[mp.cumple_end, mp.cumple_sol, mp.cumple_disp, mp.cumple_des, mp.cumplimiento_4_criterios]} />
-                        <CriterioRow label="Cumple Endeudamiento" value={mp.cumple_end} />
-                        <CriterioRow label="Cumple Solvencia" value={mp.cumple_sol} />
-                        <CriterioRow label="Cumple Disponible" value={mp.cumple_disp} />
-                        <CriterioRow label="Cumple Desprotegido" value={mp.cumple_des} />
-                        <CriterioRow label="Cumplimiento 4 Criterios" value={mp.cumplimiento_4_criterios} />
+                        <CriteriaSummary values={[normBool(mp.cumple_end), normBool(mp.cumple_sol), normBool(mp.cumple_disp), normBool(mp.cumple_des), normBool(mp.cumplimiento_4_criterios)]} />
+                        <CriterioRow label="Cumple Endeudamiento" value={normBool(mp.cumple_end)} />
+                        <CriterioRow label="Cumple Solvencia" value={normBool(mp.cumple_sol)} />
+                        <CriterioRow label="Cumple Disponible" value={normBool(mp.cumple_disp)} />
+                        <CriterioRow label="Cumple Desprotegido" value={normBool(mp.cumple_des)} />
+                        <CriterioRow label="Cumplimiento 4 Criterios" value={normBool(mp.cumplimiento_4_criterios)} />
                     </>
                 ) : (
                     <p className="px-4 py-3 text-xs text-[#0D0D0D]/30 italic">No se ha procesado el motor para esta solicitud.</p>

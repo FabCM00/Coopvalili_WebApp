@@ -1,6 +1,6 @@
 "use client";
 
-import { type SolicitudUI, type SolicitudEstado } from "@/lib/supabase";
+import { type SolicitudUI, type SolicitudEstado } from "@/lib/types";
 import { X } from "lucide-react";
 
 export type DetailModalTab = "campos" | "motor_json";

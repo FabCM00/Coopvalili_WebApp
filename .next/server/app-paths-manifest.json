@@ -1,7 +1,0 @@
-{
-  "/(protected)/admin/usuarios/page": "app/(protected)/admin/usuarios/page.js",
-  "/api/invite-user/route": "app/api/invite-user/route.js",
-  "/login/page": "app/login/page.js",
-  "/page": "app/page.js",
-  "/set-password/page": "app/set-password/page.js"
-}

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { UserMenu } from "./UserMenu";
 import { getNavigationByRole } from "@/app/config/navigation";
@@ -31,9 +32,11 @@ export function Navbar({ role, title, subtitle }: NavbarProps) {
       {/* Brand row */}
       <div className="flex h-14 items-center justify-between px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3">
-          <img
+          <Image
             src="/Imagen1.png"
             alt="Logo"
+            width={120}
+            height={36}
             className="h-8 w-auto object-contain sm:h-9"
           />
           {(title || subtitle) && (

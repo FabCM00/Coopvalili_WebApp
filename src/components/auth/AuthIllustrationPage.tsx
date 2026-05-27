@@ -1,4 +1,5 @@
 import React from "react";
+import Image from "next/image";
 
 interface AuthIllustrationPageProps {
     imageSrc: string;
@@ -23,9 +24,11 @@ export function AuthIllustrationPage({
     return (
         <div className="relative flex min-h-screen flex-col bg-white">
             <header className="flex w-full items-center px-6 py-4">
-                <img
+                <Image
                     src="/Imagen1.png"
                     alt="Want N' Get"
+                    width={120}
+                    height={36}
                     className="h-8 w-auto object-contain sm:h-9"
                 />
             </header>

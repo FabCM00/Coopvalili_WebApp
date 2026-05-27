@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function NotFound() {
@@ -16,9 +17,11 @@ export default function NotFound() {
         <div className="relative flex h-[100dvh] w-full flex-col bg-white">
             {/* Navbar logo */}
             <header className="flex w-full items-center px-6 py-4">
-                <img
+                <Image
                     src="/Imagen1.png"
                     alt="WANT N' Get"
+                    width={120}
+                    height={36}
                     className="h-8 w-auto object-contain sm:h-9"
                 />
             </header>

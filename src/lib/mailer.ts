@@ -15,7 +15,7 @@ export async function sendPasswordResetEmail(
   const emailMessage = {
     senderAddress: FROM,
     content: {
-      subject: "Recuperación de contraseña — Portal Want N' Get",
+      subject: "Recuperación de contraseña — Coopvalili Want N' Get",
       html: buildEmail({
         title: "Recuperación de contraseña",
         body: "Recibimos una solicitud para restablecer tu contraseña. Este enlace expira en <strong>1 hora</strong>.",
@@ -46,7 +46,7 @@ export async function sendInvitationEmail(
   const emailMessage = {
     senderAddress: FROM,
     content: {
-      subject: "Invitación al Portal Want N' Get",
+      subject: "Invitación al Portal Coopvalili  Want N' Get",
       html: buildEmail({
         title: "Invitación al portal",
         body,
@@ -86,7 +86,7 @@ function buildEmail(opts: {
         <tr>
           <td style="background:#012340;padding:28px 40px;">
             <div style="color:#F29A2E;font-size:11px;font-weight:700;letter-spacing:4px;text-transform:uppercase;">WANT N&apos; GET</div>
-            <div style="color:#ffffff;font-size:16px;font-weight:600;margin-top:4px;">Portal de Motores de Crédito</div>
+            <div style="color:#ffffff;font-size:16px;font-weight:600;margin-top:4px;">Coopvalili de Motores de</div>
           </td>
         </tr>
         <tr>

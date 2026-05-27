@@ -42,6 +42,7 @@ export function LoginForm() {
   const [hasAuthError, setHasAuthError] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
+  const [isSigningIn, setIsSigningIn] = useState(false);
   const passwordRef = useRef<HTMLInputElement>(null);
 
   // Inicializar alerta desde URL
@@ -109,7 +110,9 @@ export function LoginForm() {
       setFormError("Ingresa tu contraseña.");
       return;
     }
+    setIsSigningIn(true);
     await login(email, password);
+    setIsSigningIn(false);
   };
 
   const handleBack = () => {
@@ -314,7 +317,7 @@ export function LoginForm() {
 
           <Button
             type="submit"
-            disabled={loading || redirecting}
+            disabled={isSigningIn || redirecting}
             className="h-12 w-full rounded-[10px] bg-[#F29A2E] text-base font-semibold text-[#0D0D0D] shadow-sm transition hover:bg-[#F28A2E] disabled:opacity-50"
           >
             {redirecting ? (
@@ -322,7 +325,7 @@ export function LoginForm() {
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Redirigiendo...
               </>
-            ) : loading ? (
+            ) : isSigningIn ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Iniciando sesión...

@@ -56,7 +56,7 @@ function deriveEstado(valida1: any, motor: any): string {
     const status = (motor.status ?? "").toUpperCase();
     if (status === "APROBADO" || Number(motor.viable_cmd) === 1) return "aprobado";
     if (status === "RECHAZADO" || Number(motor.viable_cmd) === 0) return "no_viable";
-    
+
     return "en_revision";
   }
   if (valida1.valida1 === 2) return "rechazado";

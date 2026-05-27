@@ -428,7 +428,20 @@ export function MotorJsonView({ solicitud, hideExpand }: { solicitud: SolicitudU
 
     const getPanelData = (panel: MotorJsonPanel): any => {
         switch (panel) {
-            case "valida1": return solicitud.raw.valida1;
+            case "valida1": {
+                const v = solicitud.raw.valida1;
+                return {
+                    radicado: v?.radicado,
+                    cedula: v?.cedula,
+                    valida1: v?.valida1,
+                    valida_activo: v?.valida_activo,
+                    valida_edad: v?.valida_edad,
+                    valida_asociado: v?.valida_asociado,
+                    valida_no_retirado: v?.valida_no_retirado,
+                    mensaje: v?.mensaje,
+                    fecha_generacion: v?.fecha_generacion,
+                };
+            }
             case "motor_data": return solicitud.raw.motor_data;
             case "motor_process": return solicitud.raw.motor_process;
             case "identity": return solicitud.raw.identity_validation;

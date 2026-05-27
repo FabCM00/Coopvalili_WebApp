@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../../auth";
 import { prisma } from "@/lib/prisma";
-
 // PATCH /api/auth/users/[id] — activa o desactiva un usuario (solo admin)
 export async function PATCH(
   req: NextRequest,

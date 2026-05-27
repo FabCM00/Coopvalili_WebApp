@@ -43,7 +43,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (!user?.passwordHash) return null;
 
-        // Cuenta desactivada por admin — error con código propio para distinguirlo en el cliente
         if (!user.active) throw new InactiveAccountError();
 
         const passwordOk = await bcrypt.compare(password, user.passwordHash);
@@ -54,7 +53,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: user.email,
           name: user.name ?? undefined,
           image: user.image ?? undefined,
-          // Mapear enum Prisma a string lowercase que espera la UI
           role: user.role === "ADMIN" ? "admin" : "user",
         };
       },

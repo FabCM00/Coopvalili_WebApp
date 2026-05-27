@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
 
   // 3 intentos por minuto por IP
-  if (isRateLimited(ip, 3, 60 * 1000)) {
+  if (await isRateLimited(ip, 3, 60 * 1000)) {
     return NextResponse.json(
       { ok: false, message: "Demasiados intentos. Espera un minuto." },
       { status: 429 },

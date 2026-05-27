@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
   const ip =
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
 
-  if (isRateLimited(`change-pw:${session.user.id}:${ip}`, 5, 60 * 1000)) {
+  if (await isRateLimited(`change-pw:${session.user.id}:${ip}`, 5, 60 * 1000)) {
     return NextResponse.json(
       { ok: false, message: "Demasiados intentos." },
       { status: 429 },

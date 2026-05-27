@@ -183,7 +183,7 @@ export function ProfileView() {
                 <div className="relative">
                   <input
                     type={showPwd ? "text" : "password"}
-                    placeholder="Escribe tu nueva contraseña"
+                    placeholder=""
                     value={pwForm.newPwd}
                     onChange={(e) =>
                       setPwForm((f) => ({ ...f, newPwd: e.target.value }))

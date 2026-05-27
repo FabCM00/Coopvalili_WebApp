@@ -78,7 +78,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // beta.31 siempre devuelve "CredentialsSignin" — consultamos el estado
         // de la cuenta para dar un mensaje preciso sin revelar usuarios inexistentes
         try {
-          const res = await fetch("/api/auth/account-status", {
+          const prefix = process.env.NEXT_PUBLIC_URL_PREFIX || "";
+          const res = await fetch(`${prefix}/api/auth/account-status`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email }),

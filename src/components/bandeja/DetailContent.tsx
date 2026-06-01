@@ -16,8 +16,14 @@ import {
     FileJson,
     ClipboardList,
     ChevronRight,
+    ChevronDown,
     Search,
 } from "lucide-react";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -366,14 +372,20 @@ export function JsonView({ data }: JsonViewProps) {
 // ─── Motor JSON View — Multi-panel ────────────────────────────────────────────
 
 type MotorJsonPanel = "valida1" | "motor_data" | "motor_process" | "identity" | "auditoria";
+type ReqRes = "req" | "res";
 
-const MOTOR_JSON_PANELS = [
-    { id: "valida1" as MotorJsonPanel, shortLabel: "Validación", icon: <ShieldCheck className="h-3.5 w-3.5" /> },
-    { id: "motor_data" as MotorJsonPanel, shortLabel: "Motor Data", icon: <Database className="h-3.5 w-3.5" /> },
-    { id: "motor_process" as MotorJsonPanel, shortLabel: "Motor Process", icon: <Cpu className="h-3.5 w-3.5" /> },
-    { id: "identity" as MotorJsonPanel, shortLabel: "Identity", icon: <FileJson className="h-3.5 w-3.5" /> },
-    { id: "auditoria" as MotorJsonPanel, shortLabel: "Auditoría", icon: <ClipboardList className="h-3.5 w-3.5" /> },
-] as const;
+const MOTOR_JSON_PANELS: {
+    id: MotorJsonPanel;
+    shortLabel: string;
+    icon: ReactNode;
+    hasReqRes: boolean;
+}[] = [
+    { id: "valida1", shortLabel: "Validación", icon: <ShieldCheck className="h-3.5 w-3.5" />, hasReqRes: true },
+    { id: "motor_data", shortLabel: "Motor Data", icon: <Database className="h-3.5 w-3.5" />, hasReqRes: true },
+    { id: "motor_process", shortLabel: "Motor Process", icon: <Cpu className="h-3.5 w-3.5" />, hasReqRes: true },
+    { id: "identity", shortLabel: "Identity", icon: <FileJson className="h-3.5 w-3.5" />, hasReqRes: true },
+    { id: "auditoria", shortLabel: "Auditoría", icon: <ClipboardList className="h-3.5 w-3.5" />, hasReqRes: false },
+];
 
 function buildAuditoriaResumen(solicitud: SolicitudUI): Record<string, any> {
     const v1 = solicitud.raw.valida1;
@@ -425,8 +437,25 @@ function buildAuditoriaResumen(solicitud: SolicitudUI): Record<string, any> {
 
 export function MotorJsonView({ solicitud, hideExpand }: { solicitud: SolicitudUI; hideExpand?: boolean }) {
     const [activePanel, setActivePanel] = useState<MotorJsonPanel>("motor_process");
+    const [panelSide, setPanelSide] = useState<Record<MotorJsonPanel, ReqRes>>({
+        valida1: "res",
+        motor_data: "res",
+        motor_process: "res",
+        identity: "res",
+        auditoria: "res",
+    });
 
-    const getPanelData = (panel: MotorJsonPanel): any => {
+    const getReqData = (panel: MotorJsonPanel): any => {
+        switch (panel) {
+            case "valida1": return solicitud.raw.valida1?.raw_json ?? null;
+            case "motor_data": return solicitud.raw.motor_data?.raw_json ?? null;
+            case "motor_process": return solicitud.raw.motor_process?.raw_json ?? null;
+            case "identity": return solicitud.raw.identity_validation?.request_json ?? null;
+            case "auditoria": return null;
+        }
+    };
+
+    const getResData = (panel: MotorJsonPanel): any => {
         switch (panel) {
             case "valida1": {
                 const v = solicitud.raw.valida1;
@@ -449,8 +478,14 @@ export function MotorJsonView({ solicitud, hideExpand }: { solicitud: SolicitudU
         }
     };
 
-    const activeDef = MOTOR_JSON_PANELS.find(p => p.id === activePanel)!;
+    const getPanelData = (panel: MotorJsonPanel): any => {
+        const panelDef = MOTOR_JSON_PANELS.find(p => p.id === panel)!;
+        if (!panelDef.hasReqRes) return getResData(panel);
+        return panelSide[panel] === "req" ? getReqData(panel) : getResData(panel);
+    };
+
     const activeData = getPanelData(activePanel);
+    const isAudit = activePanel === "auditoria";
 
     return (
         <div className="flex flex-col h-full">
@@ -458,25 +493,68 @@ export function MotorJsonView({ solicitud, hideExpand }: { solicitud: SolicitudU
                 <div className="flex min-w-max">
                     {MOTOR_JSON_PANELS.map(panel => {
                         const isActive = activePanel === panel.id;
-                        const hasData = getPanelData(panel.id) != null;
-                        const isAudit = panel.id === "auditoria";
+                        const isPanelAudit = panel.id === "auditoria";
+                        const hasData = getResData(panel.id) != null;
+                        const currentSide = panelSide[panel.id];
+
                         return (
-                            <button
-                                key={panel.id}
-                                onClick={() => setActivePanel(panel.id)}
-                                className={`relative flex items-center gap-1.5 px-4 py-2.5 text-[11px] font-semibold whitespace-nowrap transition-colors border-r border-slate-200 last:border-r-0
-                                    ${isActive
-                                        ? "bg-white text-[#012340]"
-                                        : "text-slate-400 hover:text-slate-600 hover:bg-white/70"
-                                    }`}
-                            >
-                                <span className={`flex-shrink-0 transition-colors ${isActive ? isAudit ? "text-emerald-600" : "text-[#012340]" : "text-slate-300"}`}>
-                                    {panel.icon}
-                                </span>
-                                <span>{panel.shortLabel}</span>
-                                <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${hasData ? isAudit ? "bg-emerald-500" : "bg-[#012340]/35" : "bg-slate-200"}`} />
-                                {isActive && <span className={`absolute bottom-0 left-0 right-0 h-0.5 ${isAudit ? "bg-emerald-500" : "bg-[#012340]"}`} />}
-                            </button>
+                            <Popover key={panel.id}>
+                                <PopoverTrigger asChild>
+                                    <button
+                                        onClick={() => setActivePanel(panel.id)}
+                                        className={`relative flex items-center gap-1.5 px-4 py-2.5 text-[11px] font-semibold whitespace-nowrap transition-colors border-r border-slate-200 last:border-r-0
+                                            ${isActive
+                                                ? "bg-white text-[#012340]"
+                                                : "text-slate-400 hover:text-slate-600 hover:bg-white/70"
+                                            }`}
+                                    >
+                                        <span className={`flex-shrink-0 transition-colors ${isActive ? isPanelAudit ? "text-emerald-600" : "text-[#012340]" : "text-slate-300"}`}>
+                                            {panel.icon}
+                                        </span>
+                                        <span>{panel.shortLabel}</span>
+                                        {isActive && panel.hasReqRes && (
+                                            <span className="font-mono text-[9px] font-bold uppercase tracking-wider text-[#012340]/40">
+                                                {currentSide}
+                                            </span>
+                                        )}
+                                        {!isActive && (
+                                            <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${hasData ? isPanelAudit ? "bg-emerald-500" : "bg-[#012340]/35" : "bg-slate-200"}`} />
+                                        )}
+                                        {panel.hasReqRes && (
+                                            <ChevronDown className={`h-3 w-3 flex-shrink-0 transition-colors ${isActive ? "text-[#012340]/50" : "text-slate-300"}`} />
+                                        )}
+                                        {isActive && <span className={`absolute bottom-0 left-0 right-0 h-0.5 ${isPanelAudit ? "bg-emerald-500" : "bg-[#012340]"}`} />}
+                                    </button>
+                                </PopoverTrigger>
+                                {panel.hasReqRes && (
+                                    <PopoverContent
+                                        sideOffset={4}
+                                        className="w-auto min-w-0 p-1 shadow-sm border-[#0D0D0D]/8 bg-white/95 backdrop-blur-sm"
+                                    >
+                                        <div className="flex gap-0.5">
+                                            {(["req", "res"] as ReqRes[]).map(side => {
+                                                const isCurrent = isActive && panelSide[panel.id] === side;
+                                                return (
+                                                    <button
+                                                        key={side}
+                                                        onClick={() => {
+                                                            setActivePanel(panel.id);
+                                                            setPanelSide(prev => ({ ...prev, [panel.id]: side }));
+                                                        }}
+                                                        className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-sm transition-colors
+                                                            ${isCurrent
+                                                                ? "bg-[#012340]/8 text-[#012340]"
+                                                                : "text-[#0D0D0D]/35 hover:text-[#012340]/60"
+                                                            }`}
+                                                    >
+                                                        {side === "req" ? "Req" : "Res"}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </PopoverContent>
+                                )}
+                            </Popover>
                         );
                     })}
                 </div>
@@ -493,7 +571,7 @@ export function MotorJsonView({ solicitud, hideExpand }: { solicitud: SolicitudU
                         </div>
                     </div>
                 ) : (
-                    <JsonView data={activeData} hideExpand={hideExpand} isAudit={activePanel === "auditoria"} />
+                    <JsonView data={activeData} hideExpand={hideExpand} isAudit={isAudit} />
                 )}
             </div>
         </div>

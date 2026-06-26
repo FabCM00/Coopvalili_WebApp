@@ -55,3 +55,46 @@ export async function PATCH(
 
   return NextResponse.json({ ok: true, active });
 }
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const session = await auth();
+
+  if (!session?.user) {
+    return NextResponse.json({ ok: false, message: "No autorizado." }, { status: 401 });
+  }
+  if (session.user.role !== "admin") {
+    return NextResponse.json({ ok: false, message: "Acceso denegado." }, { status: 403 });
+  }
+  const { id } = await params;
+
+  // Verificar que el usuario existe y no es admin
+  const target = await prisma.user.findUnique({
+    where: { id },
+    select: { id: true, role: true },
+  });
+
+  if (!target) {
+    return NextResponse.json({ ok: false, message: "Usuario no encontrado." }, { status: 404 });
+  }
+  if (target.role === "ADMIN") {
+    return NextResponse.json(
+      { ok: false, message: "No se puede eliminar una cuenta de administrador." },
+      { status: 403 },
+    );
+  }
+  //Evita que el admin elimine su propia cuenta
+  if (target.id === session.user.id) {
+    return NextResponse.json(
+      { ok: false, message: "No se puede eliminar la propia cuenta de administrador." },
+      { status: 403 },
+    );
+  }
+  await prisma.user.delete({
+    where: { id },
+  });
+
+  return NextResponse.json({ ok: true, message: "Usuario eliminado correctamente." });
+}

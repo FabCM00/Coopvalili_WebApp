@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { withPrismaRetry } from "@/lib/prisma-retry";
 import { generateSecureToken, expiresIn, TOKEN_EXPIRY } from "@/lib/tokens";
 import { sendPasswordResetEmail } from "@/lib/mailer";
 import { isRateLimited } from "@/lib/rate-limit";
@@ -38,27 +39,33 @@ export async function POST(req: NextRequest) {
   const email = parsed.data.email.toLowerCase().trim();
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { email },
-      select: { id: true, active: true },
-    });
+    const user = await withPrismaRetry(() =>
+      prisma.user.findUnique({
+        where: { email },
+        select: { id: true, active: true },
+      }),
+    );
 
     if (user?.active) {
       // Invalida tokens anteriores del mismo usuario
-      await prisma.passwordResetToken.updateMany({
-        where: { userId: user.id, used: false },
-        data: { used: true },
-      });
+      await withPrismaRetry(() =>
+        prisma.passwordResetToken.updateMany({
+          where: { userId: user.id, used: false },
+          data: { used: true },
+        }),
+      );
 
       const token = generateSecureToken();
 
-      await prisma.passwordResetToken.create({
-        data: {
-          userId: user.id,
-          token,
-          expiresAt: expiresIn(TOKEN_EXPIRY.RESET_PASSWORD_MIN),
-        },
-      });
+      await withPrismaRetry(() =>
+        prisma.passwordResetToken.create({
+          data: {
+            userId: user.id,
+            token,
+            expiresAt: expiresIn(TOKEN_EXPIRY.RESET_PASSWORD_MIN),
+          },
+        }),
+      );
 
       // Fire-and-forget — no bloquear la respuesta por el envío del email
       sendPasswordResetEmail(email, token).catch(console.error);

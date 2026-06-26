@@ -3,6 +3,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { auth } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
+import { withPrismaRetry } from "@/lib/prisma-retry";
 import { isRateLimited } from "@/lib/rate-limit";
 
 const schema = z.object({
@@ -53,10 +54,12 @@ export async function POST(req: NextRequest) {
 
   const passwordHash = await bcrypt.hash(parsed.data.password, 12);
 
-  await prisma.user.update({
-    where: { id: session.user.id },
-    data: { passwordHash },
-  });
+  await withPrismaRetry(() =>
+    prisma.user.update({
+      where: { id: session.user.id },
+      data: { passwordHash },
+    }),
+  );
 
   return NextResponse.json({ ok: true });
 }

@@ -1,10 +1,15 @@
+// Taxonomía de estados de una solicitud (frontend). Las reglas que derivan el
+// estado viven en src/lib/bandeja-estados.ts (documentadas y en orden).
+//   `revision` es el fallback cuando los datos están incompletos.
 export type SolicitudEstado =
+  | "valida_1"
+  | "no_valida_1"
+  | "val_identidad"
+  | "no_val_identidad"
+  | "fallo_servicios"
+  | "no_viable"
   | "aprobado"
-  | "preaprobado"
-  | "en_revision"
-  | "pendiente"
-  | "rechazado"
-  | "no_viable";
+  | "revision";
 
 export interface ValidacionItem {
   label: string;
@@ -12,47 +17,34 @@ export interface ValidacionItem {
   estado: 1 | 2 | null;
 }
 
+type Json = Record<string, any> | null;
+
 export interface Valida1ResultRow {
   radicado: string;
   cedula: string;
+  valida1: number | null;
   valida_activo: number | null;
   valida_edad: number | null;
   valida_asociado: number | null;
   valida_no_retirado: number | null;
-  valida1: number | null;
   mensaje: string | null;
-  fecha_generacion: string | null;
-  tipo_identificacion: string | null;
-  numero_identificacion: string | null;
-  cliente_empresa: string | null;
+  nombre: string | null;
   primer_apellido: string | null;
   segundo_apellido: string | null;
-  nombre: string | null;
+  email: string | null;
+  celular: string | null;
+  telefono: string | null;
+  cliente_empresa: string | null;
+  fecha_generacion: string | null;
   fecha_ingreso: string | null;
   fecha_ingreso_empresa: string | null;
-  telefono: string | null;
-  direccion: string | null;
-  asociado: string | null;
-  activo: string | null;
-  actividad_economica: string | null;
-  codigo_municipal: string | null;
-  email: string | null;
-  genero: string | null;
-  empleado: string | null;
-  tipo_contrato: string | null;
-  nivel_escolar: string | null;
-  estrato: string | null;
-  fecha_nacimiento: string | null;
-  estado_civil: string | null;
-  mujer_cabeza_familia: string | null;
-  sector_economico: string | null;
-  jornada_laboral: string | null;
-  fecha_retiro: string | null;
-  celular: string | null;
-  raw_json: Record<string, any> | null;
+  numero_identificacion: string | null;
+  tipo_identificacion: string | null;
   created_at: string;
-  gestionado_at?: string | null;
-  gestionado_by?: string | null;
+  gestionado_at: string | null;
+  gestionado_by: string | null;
+  request_json: Json;
+  response_json: Json;
 }
 
 export interface MotorProcessResultRow {
@@ -60,114 +52,82 @@ export interface MotorProcessResultRow {
   cedula: string;
   status: string | null;
   perfil: string | null;
-  totales_scor: number | null;
-  usario_credito: string | null;
-  scor_nivel_riesgo: number | null;
-  scor_edad: number | null;
-  scor_pcargo: number | null;
-  scor_vivienda: number | null;
-  scor_ant_coop: number | null;
-  scor_ant_laboral: number | null;
-  scor_ingresos: number | null;
+  concepto_definitivo: string | null;
+  monto_definitivo: number | null;
   ingresos: number | null;
   egresos: number | null;
   minimo_vital: number | null;
-  resumen_salarial: number | null;
-  cuota_tdc: number | null;
-  descuentos_ley: number | null;
-  cuota_max_endeudamiento_mensual: number | null;
-  cuota_max_capacidad_mensual: number | null;
-  cuota_max_capacidad: number | null;
-  cuota_periodica_solicitada: number | null;
-  cuota_definitiva: number | null;
-  maximo_deuda_endeudamiento: number | null;
-  maximo_deuda_desprotegido: number | null;
-  valor_final_credito_motor: number | null;
-  monto_definitivo: number | null;
-  endeudamiento_actual: string | null;
-  endeudamiento_proyectado: string | null;
-  maximo_endeudamiento: string | null;
-  cumple_end: string | null;
-  cumple_sol: string | null;
-  cumple_disp: string | null;
-  cumple_des: string | null;
-  cumplimiento_4_criterios: string | null;
-  solvencia: string | null;
-  disponible: string | null;
-  desprotegido: string | null;
-  concepto_definitivo: string | null;
-  viable_cmd: string | null;
-  raw_json: Record<string, any> | null;
-  cuota_b1: number | null;
-  cuota_b2: number | null;
-  cuota_b3: number | null;
-  monto_credito_b1: number | null;
-  monto_credito_b2: number | null;
-  monto_credito_b3: number | null;
-  cumple_4_criterios_b1: string | number | null;
-  cumple_4_criterios_b2: string | number | null;
-  cumple_4_criterios_b3: string | number | null;
+  solvencia: number | null;
+  disponible: number | null;
+  desprotegido: number | null;
+  endeudamiento_actual: number | null;
+  endeudamiento_proyectado: number | null;
+  cumple_end: number | null;
+  cumple_sol: number | null;
+  cumple_disp: number | null;
+  cumple_des: number | null;
+  cumplimiento_4_criterios: number | null;
+  viable_cmd: number | null;
+  instancia_aprobacion: number | null;
   created_at: string;
+  request_json: Json;
+  response_json: Json;
+  // Escenarios B1/B2/B3 — opcionales: no vienen en el payload actual del motor.
+  monto_credito_b1?: number | null;
+  monto_credito_b2?: number | null;
+  monto_credito_b3?: number | null;
+  cuota_b1?: number | null;
+  cuota_b2?: number | null;
+  cuota_b3?: number | null;
+  cumple_4_criterios_b1?: string | number | null;
+  cumple_4_criterios_b2?: string | number | null;
+  cumple_4_criterios_b3?: string | number | null;
 }
 
 export interface MotorDataResultRow {
-  radicado_valida1: string | null;
+  radicado: string | null;
   cedula: string;
   status: string | null;
-  garantia: string | null;
-  aportes: number | null;
-  aporte_mensual: number | null;
-  deuda_coopvalili: number | null;
-  deuda_sector: number | null;
-  cuota_recoge_coopvalili: number | null;
-  cuota_recoge_sector: number | null;
-  salario: number | null;
-  tipo_salario: string | null;
-  egresos_volante: number | null;
-  egresos_sector: number | null;
-  score_cifin: number | null;
-  frecuencia_pagos: string | null;
-  aportes_ahorros: number | null;
-  linea_credito: string | null;
   monto_solicitado: number | null;
-  parametro_credito: number | null;
-  instancia_aprobacion: string | null;
-  ahorros_fondo: number | null;
+  linea_credito: string | null;
+  salario: number | null;
+  egresos_volante: number | null;
+  deuda_coopvalili: number | null;
+  score_cifin: number | null;
+  edad: number | null;
+  antiguedad_laboral: number | null;
   fecha_ingreso: string | null;
   fecha_nacimiento: string | null;
-  edad: number | null;
-  personas_cargo: number | null;
-  tipo_vivienda: string | null;
-  antiguedad_fondo: number | null;
-  antiguedad_laboral: number | null;
-  tasa_usura: number | null;
-  meta_coopvalili: string | null;
-  meta_transunion: string | null;
-  meta_mensaje: string | null;
-  raw_json: Record<string, any> | null;
+  tipo_salario: string | null;
+  frecuencia_pagos: string | null;
   created_at: string;
+  request_json: Json;
+  response_json: Json;
 }
 
 export interface IdentityValidationRow {
-  id: string;
-  radicado_valida1: string | null;
+  radicado: string | null;
   cedula: string;
   tipo_validacion: string | null;
   status_document: string | null;
   status_face: string | null;
   estado_validacion: string | null;
-  request_json: Record<string, any> | null;
   created_at: string;
+  request_json: Json;
+  response_json: Json;
 }
 
 export interface CreditoDecisionRow {
   radicado: string;
-  opcion_elegida: string;
-  response: Record<string, any> | null;
+  opcion_elegida: string | null;
+  response: Json;
   created_at: string;
+  request_json: Json;
+  response_json: Json;
 }
 
-export interface SolicitudUI {
+// Fila de la lista (ligera): solo lo necesario para tabla/lista/CSV. Sin `raw`.
+export interface SolicitudResumen {
   radicado: string;
   cedula: string;
   solicitante: string;
@@ -180,6 +140,10 @@ export interface SolicitudUI {
   gestionado: boolean;
   gestionadoAt: string | null;
   validaciones: ValidacionItem[];
+}
+
+// Detalle completo (por radicado): resumen + payloads crudos para el visor.
+export interface SolicitudUI extends SolicitudResumen {
   raw: {
     valida1: Valida1ResultRow;
     motor_process: MotorProcessResultRow | null;

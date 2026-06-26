@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { withPrismaRetry } from "@/lib/prisma-retry";
 import { isRateLimited } from "@/lib/rate-limit";
 
 const schema = z.object({
@@ -12,6 +13,26 @@ const schema = z.object({
     .regex(/[A-Z]/, "Debe contener al menos una mayúscula")
     .regex(/[0-9]/, "Debe contener al menos un número"),
 });
+
+export async function GET(req: NextRequest) {
+  const token = req.nextUrl.searchParams.get("token");
+  if (!token) {
+    return NextResponse.json({ ok: false, code: "INVALID" }, { status: 400 });
+  }
+
+  const record = await withPrismaRetry(() =>
+    prisma.passwordResetToken.findUnique({
+      where: { token },
+      select: { used: true, expiresAt: true },
+    }),
+  );
+
+  if (!record) return NextResponse.json({ ok: false, code: "INVALID" });
+  if (record.used) return NextResponse.json({ ok: false, code: "ALREADY_USED" });
+  if (record.expiresAt < new Date()) return NextResponse.json({ ok: false, code: "EXPIRED" });
+
+  return NextResponse.json({ ok: true });
+}
 
 export async function POST(req: NextRequest) {
   const ip =
@@ -44,10 +65,12 @@ export async function POST(req: NextRequest) {
 
   const { token, password } = parsed.data;
 
-  const record = await prisma.passwordResetToken.findUnique({
-    where: { token },
-    select: { id: true, userId: true, used: true, expiresAt: true },
-  });
+  const record = await withPrismaRetry(() =>
+    prisma.passwordResetToken.findUnique({
+      where: { token },
+      select: { id: true, userId: true, used: true, expiresAt: true },
+    }),
+  );
 
   if (!record || record.used || record.expiresAt < new Date()) {
     return NextResponse.json(
@@ -58,16 +81,18 @@ export async function POST(req: NextRequest) {
 
   const passwordHash = await bcrypt.hash(password, 12);
 
-  await prisma.$transaction([
-    prisma.user.update({
-      where: { id: record.userId },
-      data: { passwordHash, active: true },
-    }),
-    prisma.passwordResetToken.update({
-      where: { id: record.id },
-      data: { used: true },
-    }),
-  ]);
+  await withPrismaRetry(() =>
+    prisma.$transaction([
+      prisma.user.update({
+        where: { id: record.userId },
+        data: { passwordHash, active: true },
+      }),
+      prisma.passwordResetToken.update({
+        where: { id: record.id },
+        data: { used: true },
+      }),
+    ]),
+  );
 
   return NextResponse.json({ ok: true });
 }

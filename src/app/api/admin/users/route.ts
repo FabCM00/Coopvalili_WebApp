@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
+import { withPrismaRetry } from "@/lib/prisma-retry";
 
 // Lista usuarios (excluye admins) para el panel de administración
 export async function GET() {
@@ -13,19 +14,21 @@ export async function GET() {
     return NextResponse.json({ ok: false, message: "Acceso denegado." }, { status: 403 });
   }
 
-  const users = await prisma.user.findMany({
-    where: { role: "USER" },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      role: true,
-      active: true,
-      passwordHash: true,
-      createdAt: true,
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const users = await withPrismaRetry(() =>
+    prisma.user.findMany({
+      where: { role: "USER" },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        active: true,
+        passwordHash: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+  );
 
   // Mapea al shape que espera la UI
   // passwordSet distingue "Pendiente" (invitado, sin contraseña) de "Inactivo" (desactivado)

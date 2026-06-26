@@ -4,11 +4,13 @@ import Image from "next/image";
 
 interface LoadingScreenProps {
     message?: string;
+    /** true (default): ocupa toda la ventana. false: ocupa el contenedor padre. */
+    fullScreen?: boolean;
 }
 
-export function LoadingScreen({ message = "Cargando..." }: LoadingScreenProps) {
+export function LoadingScreen({ message = "Cargando...", fullScreen = true }: LoadingScreenProps) {
     return (
-        <div className="flex h-[100dvh] w-full flex-col items-center justify-center bg-white gap-10">
+        <div className={`flex ${fullScreen ? "h-[100dvh]" : "h-full"} w-full flex-col items-center justify-center bg-white gap-10`}>
 
             {/* Logo */}
             <Image

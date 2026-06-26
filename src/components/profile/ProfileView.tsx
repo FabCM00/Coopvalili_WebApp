@@ -1,8 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { Shield, Clock, Mail, Lock, Eye, EyeOff, ChevronDown } from "lucide-react";
+import {
+  Shield,
+  Clock,
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  ChevronDown,
+  Database,
+  RefreshCw,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function ProfileView() {
@@ -16,6 +26,48 @@ export function ProfileView() {
     null,
   );
 
+  // Estado de la base de datos (health-check contra /api/health).
+  const [dbStatus, setDbStatus] = useState<"loading" | "ok" | "down">(
+    "loading",
+  );
+  const [dbLatency, setDbLatency] = useState<number | null>(null);
+  const [dbChecking, setDbChecking] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    const check = async () => {
+      setDbChecking(true);
+      try {
+        const res = await fetch("/api/health", { cache: "no-store" });
+        const json = (await res.json()) as { db?: string; latencyMs?: number };
+        if (!active) return;
+        if (res.ok && json.db === "ok") {
+          setDbStatus("ok");
+          setDbLatency(
+            typeof json.latencyMs === "number" ? json.latencyMs : null,
+          );
+        } else {
+          setDbStatus("down");
+          setDbLatency(null);
+        }
+      } catch {
+        if (active) {
+          setDbStatus("down");
+          setDbLatency(null);
+        }
+      } finally {
+        if (active) setDbChecking(false);
+      }
+    };
+    check();
+    const id = setInterval(check, 30_000);
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
+  }, [refreshTick]);
+
   if (!profile) return null;
 
   const inicial = (profile.username ?? profile.email ?? "?")
@@ -24,10 +76,10 @@ export function ProfileView() {
 
   const fechaRegistro = profile.created_at
     ? new Date(profile.created_at).toLocaleDateString("es-CO", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      })
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    })
     : "—";
 
   const rolLabel = profile.role === "admin" ? "Administrador" : "Usuario";
@@ -35,41 +87,32 @@ export function ProfileView() {
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
     setPwResult(null);
-
-    if (pwForm.newPwd.length < 8) {
-      setPwResult({ ok: false, msg: "La contraseña debe tener al menos 8 caracteres." });
-      return;
-    }
-    if (!/[A-Z]/.test(pwForm.newPwd)) {
-      setPwResult({ ok: false, msg: "Debe contener al menos una mayúscula." });
-      return;
-    }
-    if (!/[0-9]/.test(pwForm.newPwd)) {
-      setPwResult({ ok: false, msg: "Debe contener al menos un número." });
+    if (pwForm.newPwd.length < 6) {
+      setPwResult({
+        ok: false,
+        msg: "La contraseña debe tener al menos 6 caracteres.",
+      });
       return;
     }
     if (pwForm.newPwd !== pwForm.confirmPwd) {
       setPwResult({ ok: false, msg: "Las contraseñas no coinciden." });
       return;
     }
-
     setPwLoading(true);
-
     try {
       const res = await fetch("/api/auth/change-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: pwForm.newPwd }),
       });
-      const json = await res.json().catch(() => ({}));
-
+      const json = (await res.json()) as { ok: boolean; message?: string };
       if (json.ok) {
         setPwResult({ ok: true, msg: "Contraseña actualizada correctamente." });
         setPwForm({ newPwd: "", confirmPwd: "" });
       } else {
         setPwResult({
           ok: false,
-          msg: json.message ?? "Error al actualizar la contraseña.",
+          msg: json.message || "Error al actualizar la contraseña.",
         });
       }
     } catch {
@@ -79,12 +122,41 @@ export function ProfileView() {
     }
   };
 
+  const dbBadge = {
+    loading: {
+      accent: "border-l-[#0D0D0D]/20",
+      dot: "bg-[#0D0D0D]/30",
+      badge: "border-[#0D0D0D]/15 bg-[#0D0D0D]/[0.03] text-[#0D0D0D]/50",
+      label: "Verificando…",
+      detail: "Comprobando conexión…",
+    },
+    ok: {
+      accent: "border-l-emerald-500",
+      dot: "bg-emerald-500",
+      badge: "border-green-200 bg-green-50 text-green-700",
+      label: "OK",
+      detail:
+        dbLatency != null
+          ? `Conexión verificada · ${dbLatency} ms`
+          : "Conexión verificada",
+    },
+    down: {
+      accent: "border-l-red-500",
+      dot: "bg-red-500",
+      badge: "border-red-200 bg-red-50 text-red-700",
+      label: "Sin conexión",
+      detail: "No se pudo conectar con la base de datos",
+    },
+  }[dbStatus];
+
   return (
     <div className="flex flex-col gap-8">
       {/* Header */}
       <div>
         <h2 className="text-base font-bold text-[#012340]">Mi perfil</h2>
-        <p className="mt-0.5 text-xs text-[#0D0D0D]/40">Información de tu cuenta</p>
+        <p className="mt-0.5 text-xs text-[#0D0D0D]/40">
+          Información de tu cuenta
+        </p>
       </div>
 
       {/* Identidad */}
@@ -99,7 +171,9 @@ export function ProfileView() {
           <h3 className="text-xl font-bold text-[#012340] truncate">
             {profile.username}
           </h3>
-          <p className="mt-1 text-sm text-[#0D0D0D]/55 truncate">{profile.email}</p>
+          <p className="mt-1 text-sm text-[#0D0D0D]/55 truncate">
+            {profile.email}
+          </p>
         </div>
         <div className="flex-shrink-0 text-right">
           <p className="text-[10px] font-bold tracking-[0.18em] uppercase text-[#0D0D0D]/35 mb-2">
@@ -108,12 +182,16 @@ export function ProfileView() {
           {profile.estado ? (
             <div className="inline-flex items-center gap-1.5 border border-green-200 bg-green-50 px-3 py-1">
               <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-              <span className="text-[11px] font-bold text-green-700">Activo</span>
+              <span className="text-[11px] font-bold text-green-700">
+                Activo
+              </span>
             </div>
           ) : (
             <div className="inline-flex items-center gap-1.5 border border-red-200 bg-red-50 px-3 py-1">
               <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-              <span className="text-[11px] font-bold text-red-700">Inactivo</span>
+              <span className="text-[11px] font-bold text-red-700">
+                Inactivo
+              </span>
             </div>
           )}
         </div>
@@ -146,7 +224,59 @@ export function ProfileView() {
         </div>
       </div>
 
-      {/* Cambiar contraseña */}
+      {/* Estado del sistema */}
+      <div>
+        <p className="text-[10px] font-bold tracking-[0.18em] uppercase text-[#0D0D0D]/35 mb-4">
+          Estado del sistema
+        </p>
+        <div
+          className={cn(
+            "flex items-center justify-between gap-4 border border-[#0D0D0D]/10 border-l-4 bg-white p-4",
+            dbBadge.accent,
+          )}
+        >
+          <div className="flex min-w-0 items-center gap-3">
+            <Database className="h-5 w-5 flex-shrink-0 text-[#012340]/50" />
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-[#012340]">Base de datos</p>
+              <p className="truncate text-xs text-[#0D0D0D]/45">
+                {dbBadge.detail}
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-shrink-0 items-center gap-2">
+            <span
+              className={cn(
+                "inline-flex items-center gap-1.5 border px-3 py-1",
+                dbBadge.badge,
+              )}
+            >
+              <span
+                className={cn(
+                  "h-1.5 w-1.5 rounded-full",
+                  dbBadge.dot,
+                  dbStatus === "loading" && "animate-pulse",
+                )}
+              />
+              <span className="text-[11px] font-bold">{dbBadge.label}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setRefreshTick((t) => t + 1)}
+              disabled={dbChecking}
+              title="Volver a comprobar"
+              aria-label="Volver a comprobar el estado de la base de datos"
+              className="flex h-7 w-7 items-center justify-center border border-[#0D0D0D]/15 text-[#0D0D0D]/50 transition hover:border-[#012340]/30 hover:text-[#012340] disabled:opacity-50"
+            >
+              <RefreshCw
+                className={cn("h-3.5 w-3.5", dbChecking && "animate-spin")}
+              />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Card acordeón — Cambiar contraseña */}
       <div className="bg-white border border-[#0D0D0D]/10">
         <button
           type="button"
@@ -183,7 +313,7 @@ export function ProfileView() {
                 <div className="relative">
                   <input
                     type={showPwd ? "text" : "password"}
-                    placeholder=""
+                    placeholder="Mínimo 6 caracteres"
                     value={pwForm.newPwd}
                     onChange={(e) =>
                       setPwForm((f) => ({ ...f, newPwd: e.target.value }))
@@ -223,9 +353,8 @@ export function ProfileView() {
 
               {pwResult && (
                 <p
-                  className={`text-sm font-medium ${
-                    pwResult.ok ? "text-green-700" : "text-red-600"
-                  }`}
+                  className={`text-sm font-medium ${pwResult.ok ? "text-green-700" : "text-red-600"
+                    }`}
                 >
                   {pwResult.msg}
                 </p>
@@ -247,6 +376,7 @@ export function ProfileView() {
     </div>
   );
 }
+
 
 interface InfoCardProps {
   color: string;

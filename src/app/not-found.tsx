@@ -2,62 +2,72 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function NotFound() {
-    const { profile } = useAuth();
+  const { profile } = useAuth();
 
-    const homeHref = profile?.role === "admin"
-        ? "/admin/usuarios"
-        : profile?.role === "user"
-            ? "/usuario/bandeja"
-            : "/login";
+  const homeHref =
+    profile?.role === "admin"
+      ? "/admin/usuarios"
+      : profile?.role === "user"
+        ? "/usuario/bandeja"
+        : "/login";
 
-    return (
-        <div className="relative flex h-[100dvh] w-full flex-col bg-white">
-            {/* Navbar logo */}
-            <header className="flex w-full items-center px-6 py-4">
-                <Image
-                    src="/Imagen1.png"
-                    alt="WANT N' Get"
-                    width={120}
-                    height={36}
-                    className="h-8 w-auto object-contain sm:h-9"
-                />
-            </header>
+  return (
+    <div className="min-h-screen bg-white">
+      {/* Header */}
+      <header className="flex items-center px-6 py-5">
+        <Image
+          src="/Imagen1.png"
+          alt="Want Tech 4 All"
+          width={130}
+          height={40}
+          priority
+          className="h-9 w-auto"
+        />
+      </header>
 
-            {/* Contenido centrado */}
-            <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
-                <img
-                    src="/404.png"
-                    alt="Página no encontrada"
-                    className="w-full max-w-[320px] select-none mb-8"
-                    draggable={false}
-                />
+      {/* Content */}
+      <main className="mx-auto flex min-h-[calc(100vh-80px)] max-w-6xl flex-col items-center justify-center px-6 text-center">
+        <Image
+          src="/404.png"
+          alt="Error 404"
+          width={900}
+          height={600}
+          priority
+          className="mb-8 w-full max-w-3xl select-none object-contain"
+          draggable={false}
+        />
 
-                <h1 className="text-3xl font-bold text-[#012340] mb-3">
-                    Página no encontrada
-                </h1>
-                <p className="text-base leading-relaxed text-[#0D0D0D]/55 max-w-sm mb-8">
-                    La ruta que intentas acceder no existe o fue movida.
-                    Verifica la URL o regresa a la plataforma.
-                </p>
+        <h1 className="mb-3 text-4xl font-bold text-[#012340]">
+          Página no encontrada
+        </h1>
 
-                <div className="flex flex-col sm:flex-row items-center gap-3 w-full max-w-sm">
-                    <Link
-                        href={homeHref}
-                        className="flex h-12 w-full items-center justify-center rounded-[10px] bg-[#F29A2E] text-base font-semibold text-[#0D0D0D] shadow-sm transition hover:bg-[#F28A2E]"
-                    >
-                        Ir al inicio
-                    </Link>
-                    <button
-                        onClick={() => history.back()}
-                        className="flex h-12 w-full items-center justify-center rounded-[10px] border border-[#0D0D0D]/15 text-base font-semibold text-[#0D0D0D]/60 transition hover:border-[#012340] hover:text-[#012340]"
-                    >
-                        Volver atrás
-                    </button>
-                </div>
-            </div>
+        <p className="mb-8 max-w-md text-base text-slate-500">
+          La página que intentas visitar no existe, fue movida o el enlace es
+          incorrecto.
+        </p>
+
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Link
+            href={homeHref}
+            className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#F29A2E] px-6 font-semibold text-white transition-all hover:bg-[#e48716]"
+          >
+            Ir al inicio
+            <ArrowRight size={18} />
+          </Link>
+
+          <button
+            onClick={() => window.history.back()}
+            className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 px-6 font-semibold text-[#012340] transition-all hover:border-[#012340]"
+          >
+            <ArrowLeft size={18} />
+            Volver atrás
+          </button>
         </div>
-    );
+      </main>
+    </div>
+  );
 }

@@ -1,6 +1,15 @@
 import type { NextAuthConfig } from "next-auth";
 
 /**
+ * Prefijo propio de ESTA app para sus cookies de sesión. Debe ser DISTINTO en
+ * cada despliegue que comparta dominio (p. ej. "coopvalili", "coop"); así la cookie
+ * de una app no es leída ni sobrescrita por la otra y no se "roban" la sesión.
+ */
+const COOKIE_PREFIX = "coopvalili";
+const useSecureCookies = process.env.NODE_ENV === "production";
+const cookieBase = `${useSecureCookies ? "__Secure-" : ""}${COOKIE_PREFIX}`;
+
+/**
  * Configuración base de Auth.js — 100% compatible con Edge Runtime.
  * No importa Prisma, bcrypt ni ningún módulo exclusivo de Node.js.
  * El middleware y auth.ts la reutilizan para compartir callbacks.
@@ -11,6 +20,36 @@ export const authConfig = {
     error: "/login",
   },
   session: { strategy: "jwt" as const },
+  // Cookies con nombre propio de la app: evita que sesiones de otras apps del
+  // mismo dominio se compartan (ver COOKIE_PREFIX).
+  cookies: {
+    sessionToken: {
+      name: `${cookieBase}.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax" as const,
+        path: "/",
+        secure: useSecureCookies,
+      },
+    },
+    callbackUrl: {
+      name: `${cookieBase}.callback-url`,
+      options: {
+        sameSite: "lax" as const,
+        path: "/",
+        secure: useSecureCookies,
+      },
+    },
+    csrfToken: {
+      name: `${useSecureCookies ? "__Host-" : ""}${COOKIE_PREFIX}.csrf-token`,
+      options: {
+        httpOnly: true,
+        sameSite: "lax" as const,
+        path: "/",
+        secure: useSecureCookies,
+      },
+    },
+  },
   callbacks: {
     /**
      * Se ejecuta en el middleware (Edge Runtime).

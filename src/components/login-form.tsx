@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import {
   Mail,
   ShieldCheck,
@@ -18,6 +21,16 @@ import { Button } from "@/components/ui/button";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { useAuth } from "@/contexts/AuthContext";
 
+const loginSchema = z.object({
+  email: z
+    .string()
+    .min(1, "Ingresa tu correo electrónico.")
+    .email("Ingresa un correo válido."),
+  password: z.string().min(1, "Ingresa tu contraseña."),
+});
+
+type LoginFormValues = z.infer<typeof loginSchema>;
+
 const inputBase =
   "w-full h-12 rounded-[10px] border-[1.2px] bg-white pl-11 pr-11 text-base shadow-sm outline-none transition";
 const inputNormal =
@@ -28,44 +41,48 @@ const inputError =
 type AlertType = "expired" | "closed" | null;
 
 export function LoginForm() {
-  const { login, error, loading } = useAuth();
+  const { login, error } = useAuth();
   const { data: session } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const [activeAlert, setActiveAlert] = useState<AlertType>(null);
   const [step, setStep] = useState<1 | 2>(1);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [hasAuthError, setHasAuthError] = useState(false);
-  const [redirecting, setRedirecting] = useState(false);
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
-  const passwordRef = useRef<HTMLInputElement>(null);
+  const [redirecting, setRedirecting] = useState(false);
 
-  // Inicializar alerta desde URL
+  const {
+    register,
+    handleSubmit,
+    trigger,
+    watch,
+    setValue,
+    setError,
+    clearErrors,
+    setFocus,
+    formState: { errors },
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    mode: "onSubmit",
+    reValidateMode: "onChange",
+  });
+
+  const email = watch("email", "");
+
   useEffect(() => {
     const sessionParam = searchParams.get("session");
-    if (sessionParam === "expired") {
-      setActiveAlert("expired");
-    } else if (sessionParam === "closed") {
-      setActiveAlert("closed");
-    }
+    if (sessionParam === "expired") setActiveAlert("expired");
+    else if (sessionParam === "closed") setActiveAlert("closed");
   }, [searchParams]);
 
-  // Temporizador para desaparecer la alerta (5 segundos)
   useEffect(() => {
-    if (activeAlert) {
-      const timer = setTimeout(() => {
-        setActiveAlert(null);
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
+    if (!activeAlert) return;
+    const timer = setTimeout(() => setActiveAlert(null), 5000);
+    return () => clearTimeout(timer);
   }, [activeAlert]);
 
-  // Redirección por sesión activa
   useEffect(() => {
     if (session?.user) {
       setRedirecting(true);
@@ -75,61 +92,45 @@ export function LoginForm() {
   }, [session, router]);
 
   useEffect(() => {
-    if (error) setHasAuthError(true);
-  }, [error]);
+    if (error) {
+      setError("password", {
+        type: "server",
+        message: error ?? "Correo o contraseña incorrectos.",
+      });
+    }
+  }, [error, setError]);
 
   useEffect(() => {
-    if (step === 2) setTimeout(() => passwordRef.current?.focus(), 50);
-  }, [step]);
+    if (step === 2) setTimeout(() => setFocus("password"), 50);
+  }, [step, setFocus]);
 
-  const handleContinue = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError(null);
-    if (!email) {
-      setFormError("Ingresa tu correo electrónico.");
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setFormError("Ingresa un correo válido.");
-      return;
-    }
-
-    // Activa el estado de carga simulado antes de pasar al paso de contraseña
+  const handleContinue = async () => {
+    const valid = await trigger("email");
+    if (!valid) return;
     setIsCheckingEmail(true);
     setTimeout(() => {
       setIsCheckingEmail(false);
       setStep(2);
-    }, 600); // Pequeña transición fluida de carga
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError(null);
-    setHasAuthError(false);
-    if (!password) {
-      setFormError("Ingresa tu contraseña.");
-      return;
-    }
-    setIsSigningIn(true);
-    await login(email, password);
-    setIsSigningIn(false);
+    }, 600);
   };
 
   const handleBack = () => {
     setStep(1);
-    setPassword("");
-    setFormError(null);
-    setHasAuthError(false);
+    setValue("password", "");
+    clearErrors("password");
   };
 
-  const errorMessage =
-    formError ||
-    (hasAuthError ? (error ?? "Correo o contraseña incorrectos.") : null);
-  const showErr = !!errorMessage;
+  const onSubmit = async (data: LoginFormValues) => {
+    setIsSigningIn(true);
+    await login(data.email, data.password);
+    setIsSigningIn(false);
+  };
+
+  const emailError = errors.email?.message;
+  const passwordError = errors.password?.message;
 
   return (
     <AuthShell>
-      {/* Alerta de Sesión Expirada */}
       {activeAlert === "expired" && (
         <div className="flex items-start gap-3 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 relative">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
@@ -147,7 +148,6 @@ export function LoginForm() {
         </div>
       )}
 
-      {/* Alerta de Sesión Cerrada (Estilizada en color corporativo ámbar/naranja similar al botón) */}
       {activeAlert === "closed" && (
         <div className="flex items-start gap-3 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 relative">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#F29A2E]" />
@@ -178,7 +178,13 @@ export function LoginForm() {
 
       {/* Step 1 — Correo */}
       {step === 1 && (
-        <form onSubmit={handleContinue} className="flex flex-col gap-5">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleContinue();
+          }}
+          className="flex flex-col gap-5"
+        >
           <div className="flex flex-col gap-2">
             <label
               htmlFor="email"
@@ -190,25 +196,24 @@ export function LoginForm() {
               <Mail
                 className={cn(
                   "pointer-events-none absolute top-1/2 left-3.5 h-5 w-5 -translate-y-1/2 transition",
-                  showErr ? "text-red-500" : "text-[#0D0D0D]/40",
+                  emailError ? "text-red-500" : "text-[#0D0D0D]/40",
                 )}
               />
               <input
                 id="email"
                 type="email"
                 placeholder="Ingresa tu correo"
-                value={email}
                 autoFocus
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  if (formError) setFormError(null);
-                }}
-                className={cn(inputBase, showErr ? inputError : inputNormal)}
+                {...register("email")}
+                className={cn(inputBase, emailError ? inputError : inputNormal)}
               />
               {email && (
                 <button
                   type="button"
-                  onClick={() => setEmail("")}
+                  onClick={() => {
+                    setValue("email", "");
+                    clearErrors("email");
+                  }}
                   className="absolute top-1/2 right-3.5 -translate-y-1/2 text-[#0D0D0D]/40 hover:text-[#0D0D0D]/70 transition"
                   aria-label="Limpiar correo"
                 >
@@ -216,8 +221,8 @@ export function LoginForm() {
                 </button>
               )}
             </div>
-            {showErr && (
-              <p className="text-sm font-medium text-red-600">{errorMessage}</p>
+            {emailError && (
+              <p className="text-sm font-medium text-red-600">{emailError}</p>
             )}
           </div>
 
@@ -240,7 +245,7 @@ export function LoginForm() {
 
       {/* Step 2 — Contraseña */}
       {step === 2 && (
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
           <div className="flex flex-col gap-2">
             <label className="text-sm font-semibold text-[#012340]">
               Correo electrónico
@@ -275,27 +280,25 @@ export function LoginForm() {
               <ShieldCheck
                 className={cn(
                   "pointer-events-none absolute top-1/2 left-3.5 h-5 w-5 -translate-y-1/2 transition",
-                  showErr ? "text-red-500" : "text-[#0D0D0D]/40",
+                  passwordError ? "text-red-500" : "text-[#0D0D0D]/40",
                 )}
               />
               <input
-                ref={passwordRef}
                 id="password"
                 type={showPassword ? "text" : "password"}
                 placeholder="Ingresa tu contraseña"
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  if (showErr) setHasAuthError(false);
-                }}
-                className={cn(inputBase, showErr ? inputError : inputNormal)}
+                {...register("password")}
+                className={cn(
+                  inputBase,
+                  passwordError ? inputError : inputNormal,
+                )}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
                 className={cn(
                   "absolute top-1/2 right-3.5 -translate-y-1/2 transition",
-                  showErr
+                  passwordError
                     ? "text-red-500 hover:text-red-700"
                     : "text-[#0D0D0D]/40 hover:text-[#0D0D0D]/70",
                 )}
@@ -310,8 +313,10 @@ export function LoginForm() {
                 )}
               </button>
             </div>
-            {showErr && (
-              <p className="text-sm font-medium text-red-600">{errorMessage}</p>
+            {passwordError && (
+              <p className="text-sm font-medium text-red-600">
+                {passwordError}
+              </p>
             )}
           </div>
 

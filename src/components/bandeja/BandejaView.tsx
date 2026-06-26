@@ -1,506 +1,791 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import type { SolicitudUI, SolicitudEstado } from "@/lib/types";
+import Image from "next/image";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import {
+  bandeja,
+  ESTADO_LABEL,
+  ESTADO_DOT,
+  ESTADO_BADGE,
+  type SolicitudUI,
+  type SolicitudResumen,
+} from "@/lib/bandeja";
 import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, RefreshCw, Download, Inbox, Maximize2, ChevronDown, PanelLeftClose, PanelLeft } from "lucide-react";
+import {
+  Search,
+  RefreshCw,
+  Download,
+  Inbox,
+  Maximize2,
+  PanelLeftClose,
+  PanelLeft,
+  SlidersHorizontal,
+  MoreVertical,
+  CheckCircle2,
+  X,
+} from "lucide-react";
+import { LoadingScreen } from "@/components/LoadingScreen";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import { RequestDetail } from "./RequestDetail";
 import { RequestDetailModal } from "./RequestDetailModal";
 import { ModalTabs, type DetailModalTab } from "./ModalHeader";
+import { BandejaFiltros, FILTROS, type FiltroTab } from "./BandejaFiltros";
 
 type Mode = "admin" | "user";
 
 interface BandejaViewProps {
-    mode: Mode;
-    cedulaFilter?: string;
+  mode: Mode;
+  cedulaFilter?: string;
 }
 
-type FiltroTab = "todos" | SolicitudEstado;
-
-const FILTROS: { id: FiltroTab; label: string }[] = [
-    { id: "todos", label: "Todos" },
-    { id: "aprobado", label: "Aprobado" },
-    { id: "preaprobado", label: "Preaprobado" },
-    { id: "en_revision", label: "En revisión" },
-    { id: "pendiente", label: "Pendiente" },
-    { id: "rechazado", label: "Rechazado" },
-    { id: "no_viable", label: "No viable" },
-];
-
-const ESTADO_LABEL: Record<SolicitudEstado, string> = {
-    aprobado: "Aprobado",
-    preaprobado: "Preaprobado",
-    en_revision: "En revisión",
-    pendiente: "Pendiente",
-    rechazado: "Rechazado",
-    no_viable: "No viable",
-};
-
-const ESTADO_DOT: Record<SolicitudEstado, string> = {
-    aprobado: "bg-green-500",
-    preaprobado: "bg-blue-500",
-    en_revision: "bg-amber-500",
-    pendiente: "bg-gray-400",
-    rechazado: "bg-red-500",
-    no_viable: "bg-orange-500",
-};
+const PAGE_SIZE = 20;
+const SKELETON_ROWS = Array.from({ length: 8 }, (_, i) => i);
+const COP_FORMATTER = new Intl.NumberFormat("es-CO");
 
 export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
-    const { user } = useAuth();
-    const [solicitudes, setSolicitudes] = useState<SolicitudUI[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [refreshing, setRefreshing] = useState(false);
-    const [query, setQuery] = useState("");
-    const [filtro, setFiltro] = useState<FiltroTab>("todos");
-    const [selectedRadicado, setSelectedRadicado] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<DetailModalTab>("campos");
-    const [page, setPage] = useState(1);
-    const [vistaGestionados, setVistaGestionados] = useState(false);
-    const [confirmRadicado, setConfirmRadicado] = useState<string | null>(null);
-    const [gestionando, setGestionando] = useState(false);
-    const [modalOpen, setModalOpen] = useState(false);
-    const [filtroOpen, setFiltroOpen] = useState(false);
-    const [showList, setShowList] = useState(true);
-    const filtroRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuth();
+  const [solicitudes, setSolicitudes] = useState<SolicitudResumen[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [rawQuery, setRawQuery] = useState("");
+  const [query, setQuery] = useState("");
+  const [filtro, setFiltro] = useState<FiltroTab>("todos");
+  const [selectedRadicado, setSelectedRadicado] = useState<string | null>(null);
+  const [selectedDetail, setSelectedDetail] = useState<SolicitudUI | null>(
+    null,
+  );
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<DetailModalTab>("campos");
+  const [page, setPage] = useState(1);
+  const [vistaGestionados, setVistaGestionados] = useState(false);
+  const [confirmRadicado, setConfirmRadicado] = useState<string | null>(null);
+  const [gestionando, setGestionando] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [filtroOpen, setFiltroOpen] = useState(false);
+  const [showList, setShowList] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [autoRefreshSecs, setAutoRefreshSecs] = useState(30);
 
-    useEffect(() => {
-        if (!filtroOpen) return;
-        const handler = (e: MouseEvent) => {
-            if (filtroRef.current && !filtroRef.current.contains(e.target as Node))
-                setFiltroOpen(false);
-        };
-        document.addEventListener("mousedown", handler);
-        return () => document.removeEventListener("mousedown", handler);
-    }, [filtroOpen]);
+  useEffect(() => {
+    const t = setTimeout(() => setQuery(rawQuery), 250);
+    return () => clearTimeout(t);
+  }, [rawQuery]);
 
-    const PAGE_SIZE = 20;
+  const fetchData = useCallback(
+    async (clearSelection = false) => {
+      const r = await bandeja.listSolicitudes({ limit: 500, cedulaFilter });
+      if (!r.ok) {
+        setError(r.error.message);
+        setSolicitudes([]);
+        return;
+      }
+      setError(null);
+      setSolicitudes(r.data);
+      setLastUpdated(new Date());
+      setAutoRefreshSecs(30);
+      if (clearSelection) {
+        setSelectedRadicado(null);
+      } else {
+        setSelectedRadicado((cur) => {
+          if (cur && r.data.some((s) => s.radicado === cur)) return cur;
+          return null;
+        });
+      }
+    },
+    [cedulaFilter],
+  );
 
-    const fetchData = useCallback(async (clearSelection = false) => {
-        const prefix = process.env.NEXT_PUBLIC_URL_PREFIX || "";
-        const url = `${prefix}/api/usuario/bandeja?limit=200${cedulaFilter ? `&cedulaFilter=${cedulaFilter}` : ""}`;
-        try {
-            const res = await fetch(url);
-            const r = await res.json();
-            if (!res.ok || !r.ok) {
-                setError(r.message || "Error al cargar solicitudes");
-                setSolicitudes([]);
-                return;
-            }
-            setError(null);
-            setSolicitudes(r.data);
-            if (clearSelection) {
-                setSelectedRadicado(null);
-            } else {
-                setSelectedRadicado((cur) => {
-                    if (cur && r.data.some((s: any) => s.radicado === cur)) return cur;
-                    return null;
-                });
-            }
-        } catch (err: any) {
-            setError(err?.message || "Error de red al cargar solicitudes");
-            setSolicitudes([]);
-        }
-    }, [cedulaFilter]);
+  useEffect(() => {
+    setLoading(true);
+    fetchData().finally(() => setLoading(false));
+  }, [fetchData]);
 
-    useEffect(() => {
-        setLoading(true);
-        fetchData().finally(() => setLoading(false));
-    }, [fetchData]);
+  // Auto-refresh cada 30 segundos
+  useEffect(() => {
+    if (autoRefreshSecs <= 0) {
+      fetchData();
+      return;
+    }
+    const t = setTimeout(() => setAutoRefreshSecs((n) => n - 1), 1000);
+    return () => clearTimeout(t);
+  }, [autoRefreshSecs, fetchData]);
 
-    const handleRefresh = async () => { setRefreshing(true); await fetchData(); setRefreshing(false); };
-
-    const handleGestionar = (radicado: string) => setConfirmRadicado(radicado);
-
-    const handleConfirmGestionar = async () => {
-        if (!confirmRadicado) return;
-        setGestionando(true);
-        try {
-            const prefix = process.env.NEXT_PUBLIC_URL_PREFIX || "";
-            const res = await fetch(`${prefix}/api/usuario/bandeja`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ radicado: confirmRadicado }),
-            });
-            const r = await res.json();
-            setGestionando(false);
-            setConfirmRadicado(null);
-            if (!res.ok || !r.ok) {
-                setError(`Error al gestionar: ${r.message || "Error de red"}`);
-                return;
-            }
-            await fetchData(true);
-        } catch (err: any) {
-            setGestionando(false);
-            setConfirmRadicado(null);
-            setError(`Error al gestionar: ${err.message || "Error de red"}`);
-        }
+  // Detalle por radicado: se consulta aparte (lista ligera + detalle completo)
+  useEffect(() => {
+    if (!selectedRadicado) {
+      setSelectedDetail(null);
+      setDetailError(null);
+      return;
+    }
+    setDetailLoading(true);
+    setDetailError(null);
+    setSelectedDetail(null);
+    let cancel = false;
+    bandeja
+      .getSolicitud(selectedRadicado)
+      .then((r) => {
+        if (cancel) return;
+        if (r.ok) setSelectedDetail(r.data);
+        else setDetailError(r.error.message);
+      })
+      .finally(() => {
+        if (!cancel) setDetailLoading(false);
+      });
+    return () => {
+      cancel = true;
     };
+  }, [selectedRadicado]);
 
-    const totalActivas = useMemo(() => solicitudes.filter((s) => !s.gestionado).length, [solicitudes]);
-    const totalGestionadas = useMemo(() => solicitudes.filter((s) => s.gestionado).length, [solicitudes]);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchData();
+    setRefreshing(false);
+  };
 
-    const filtradas = useMemo(() => {
-        let out = solicitudes.filter((s) => (vistaGestionados ? s.gestionado : !s.gestionado));
-        if (filtro !== "todos") out = out.filter((s) => s.estado === filtro);
-        if (query.trim()) {
-            const q = query.toLowerCase();
-            out = out.filter(
-                (s) =>
-                    s.cedula.toLowerCase().includes(q) ||
-                    s.solicitante.toLowerCase().includes(q) ||
-                    s.radicado.toLowerCase().includes(q),
-            );
+  // Nº de filtros activos (solo Estado): "todos" no cuenta como filtro
+  const filtrosActivos = filtro !== "todos" ? 1 : 0;
+  const handleLimpiarFiltros = () => setFiltro("todos");
+
+  const handleGestionar = (radicado: string) => setConfirmRadicado(radicado);
+
+  const handleConfirmGestionar = async () => {
+    if (!confirmRadicado) return;
+    setGestionando(true);
+    const r = await bandeja.marcarGestionado(
+      confirmRadicado,
+      user?.email ?? undefined,
+    );
+    setGestionando(false);
+    setConfirmRadicado(null);
+    if (!r.ok) {
+      setError(`Error al gestionar: ${r.error.message}`);
+      return;
+    }
+    await fetchData(true);
+  };
+
+  // Un solo scan para: totales + lista base + conteos por estado
+  const { totalActivas, totalGestionadas, baseList, conteoPorEstado } =
+    useMemo(() => {
+      let activas = 0;
+      let gestionadas = 0;
+      const base: SolicitudResumen[] = [];
+      const conteo = new Map<FiltroTab, number>();
+
+      for (const s of solicitudes) {
+        if (s.gestionado) gestionadas++;
+        else activas++;
+
+        if (vistaGestionados ? s.gestionado : !s.gestionado) {
+          base.push(s);
+          conteo.set(s.estado, (conteo.get(s.estado) ?? 0) + 1);
         }
-        return out;
-    }, [solicitudes, filtro, query, vistaGestionados]);
+      }
+      conteo.set("todos", base.length);
 
-    const conteoPorEstado = useMemo(() => {
-        const base = solicitudes.filter((s) => (vistaGestionados ? s.gestionado : !s.gestionado));
-        const map = new Map<FiltroTab, number>();
-        map.set("todos", base.length);
-        for (const s of base) map.set(s.estado, (map.get(s.estado) ?? 0) + 1);
-        return map;
+      return {
+        totalActivas: activas,
+        totalGestionadas: gestionadas,
+        baseList: base,
+        conteoPorEstado: conteo,
+      };
     }, [solicitudes, vistaGestionados]);
 
-    const totalPages = Math.max(1, Math.ceil(filtradas.length / PAGE_SIZE));
-    const safePage = Math.min(page, totalPages);
-    const pageStart = (safePage - 1) * PAGE_SIZE;
-    const pageRows = filtradas.slice(pageStart, pageStart + PAGE_SIZE);
+  // Filtrado secundario: estado + búsqueda (sobre baseList ya particionada)
+  const filtradas = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (filtro === "todos" && !q) return baseList;
+    return baseList.filter((s) => {
+      if (filtro !== "todos" && s.estado !== filtro) return false;
+      if (
+        q &&
+        !s.cedula.includes(q) &&
+        !s.solicitante.toLowerCase().includes(q) &&
+        !s.radicado.includes(q)
+      )
+        return false;
+      return true;
+    });
+  }, [baseList, filtro, query]);
 
-    useEffect(() => { setPage(1); }, [filtro, query, solicitudes, vistaGestionados]);
-    useEffect(() => { setSelectedRadicado(null); setModalOpen(false); }, [vistaGestionados]);
+  const totalPages = Math.max(1, Math.ceil(filtradas.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageStart = (safePage - 1) * PAGE_SIZE;
+  const pageRows = filtradas.slice(pageStart, pageStart + PAGE_SIZE);
 
-    const seleccionada = useMemo(
-        () => solicitudes.find((s) => s.radicado === selectedRadicado) ?? null,
-        [solicitudes, selectedRadicado],
-    );
+  useEffect(() => {
+    setPage(1);
+  }, [filtro, rawQuery, solicitudes, vistaGestionados]);
+  useEffect(() => {
+    setSelectedRadicado(null);
+    setModalOpen(false);
+  }, [vistaGestionados]);
 
-    const handleExportCSV = () => {
-        if (filtradas.length === 0) return;
-        const headers = ["identificacion", "fecha", "radicado", "solicitante", "valor", "estado", "score_cifin", "gestionado"];
-        const csv = [
-            headers.join(","),
-            ...filtradas.map((s) =>
-                [s.cedula, s.fecha, s.radicado, `"${s.solicitante.replace(/"/g, '""')}"`, s.valor, ESTADO_LABEL[s.estado], s.score ?? "", s.gestionado ? (s.gestionadoAt ?? "sí") : "no"].join(","),
-            ),
-        ].join("\n");
-        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `bandeja_${vistaGestionados ? "gestionadas_" : ""}${new Date().toISOString().slice(0, 10)}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
-    };
+  const seleccionada = useMemo(
+    () => solicitudes.find((s) => s.radicado === selectedRadicado) ?? null,
+    [solicitudes, selectedRadicado],
+  );
 
-    const confirmSolicitud = confirmRadicado ? solicitudes.find((s) => s.radicado === confirmRadicado) : null;
+  const handleExportCSV = () => {
+    if (filtradas.length === 0) return;
+    const headers = [
+      "identificacion",
+      "fecha",
+      "radicado",
+      "solicitante",
+      "valor",
+      "estado",
+      "score_cifin",
+      "gestionado",
+    ];
+    const csv = [
+      headers.join(","),
+      ...filtradas.map((s) =>
+        [
+          s.cedula,
+          s.fecha,
+          s.radicado,
+          `"${s.solicitante.replace(/"/g, '""')}"`,
+          s.valor,
+          ESTADO_LABEL[s.estado],
+          s.score ?? "",
+          s.gestionado ? (s.gestionadoAt ?? "sí") : "no",
+        ].join(","),
+      ),
+    ].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `bandeja_${vistaGestionados ? "gestionadas_" : ""}${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
-    return (
-        <div className="flex flex-col -m-4 sm:-m-6 lg:-m-8 h-[calc(100%+2rem)] sm:h-[calc(100%+3rem)] lg:h-[calc(100%+4rem)]">
+  const confirmSolicitud = useMemo(
+    () =>
+      confirmRadicado
+        ? (solicitudes.find((s) => s.radicado === confirmRadicado) ?? null)
+        : null,
+    [confirmRadicado, solicitudes],
+  );
 
-            {/* ── Top bar ── */}
-            <div className="flex items-center justify-between gap-4 px-4 sm:px-6 py-3 border-b border-[#0D0D0D]/10 bg-white flex-shrink-0">
-                <div>
-                    <h2 className="text-sm font-bold text-[#012340]">
-                        {mode === "admin" ? "Bandeja de solicitudes" : "Mis solicitudes"}
-                    </h2>
-                    <p className="text-[11px] text-[#0D0D0D]/40">
-                        {loading ? "Cargando…" : `${solicitudes.length} solicitudes cargadas`}
-                    </p>
-                </div>
-                <div className="flex items-center gap-2">
-                    {seleccionada && !seleccionada.gestionado && (
-                        <Button
-                            onClick={() => handleGestionar(seleccionada.radicado)}
-                            className="rounded-none bg-[#012340] hover:bg-[#012340]/90 text-white h-8 px-3 text-[11px] font-semibold tracking-wide"
-                        >
-                            Marcar como Gestionado
-                        </Button>
-                    )}
-                    <Button variant="outline" onClick={handleExportCSV}
-                        className="rounded-none border-[#0D0D0D]/15 h-8 px-3 text-[11px] font-semibold tracking-wide hover:bg-[#012340] hover:text-white hover:border-[#012340]">
-                        <Download className="mr-1.5 h-3.5 w-3.5" /> CSV
-                    </Button>
-                    <Button onClick={handleRefresh} disabled={refreshing}
-                        className="rounded-none bg-[#012340] hover:bg-[#012340]/90 text-white h-8 px-3 text-[11px] font-semibold tracking-wide">
-                        <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
-                        Actualizar
-                    </Button>
-                </div>
-            </div>
-
-            {/* ── Error ── */}
-            {error && (
-                <div className="flex-shrink-0 border-b border-red-200 bg-red-50 px-6 py-2 text-xs text-red-700 flex items-center gap-2">
-                    <span className="font-semibold">Error:</span> {error}
-                </div>
-            )}
-
-            {/* ── Shared control row: toggle (left) + tabs (right) ── */}
-            <div className="flex items-stretch border-b border-[#0D0D0D]/10 bg-white flex-shrink-0">
-                {showList && (
-                    <div className="w-[340px] flex-shrink-0 flex border-r border-[#0D0D0D]/10 transition-all">
-                        <button
-                            onClick={() => setVistaGestionados(false)}
-                            className={`flex-1 py-2.5 text-[11px] font-semibold tracking-wide transition-all ${!vistaGestionados ? "bg-[#012340] text-white" : "text-[#0D0D0D]/50 hover:text-[#0D0D0D]/80"}`}
-                        >
-                            Activas <span className={`ml-1 text-[10px] font-bold ${!vistaGestionados ? "opacity-70" : "opacity-40"}`}>{totalActivas}</span>
-                        </button>
-                        <div className="w-px bg-[#0D0D0D]/10" />
-                        <button
-                            onClick={() => setVistaGestionados(true)}
-                            className={`flex-1 py-2.5 text-[11px] font-semibold tracking-wide transition-all ${vistaGestionados ? "bg-[#012340] text-white" : "text-[#0D0D0D]/50 hover:text-[#0D0D0D]/80"}`}
-                        >
-                            Gestionadas <span className={`ml-1 text-[10px] font-bold ${vistaGestionados ? "opacity-70" : "opacity-40"}`}>{totalGestionadas}</span>
-                        </button>
-                    </div>
-                )}
-                <div className="flex-1 flex items-center justify-between px-2">
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => setShowList(!showList)}
-                            className="p-1.5 text-[#0D0D0D]/40 hover:text-[#012340] hover:bg-[#0D0D0D]/5 rounded-md transition-colors"
-                            title={showList ? "Ocultar lista" : "Mostrar lista"}
-                        >
-                            {showList ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
-                        </button>
-                        {seleccionada && (
-                            <ModalTabs active={activeTab} onChange={setActiveTab} />
-                        )}
-                    </div>
-                    {seleccionada ? (
-                        <button
-                            onClick={() => setModalOpen(true)}
-                            title="Ver en pantalla completa"
-                            className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-semibold text-[#0D0D0D]/35 hover:text-[#012340] transition-colors flex-shrink-0"
-                        >
-                            <Maximize2 className="h-3 w-3" />
-                            Expandir
-                        </button>
-                    ) : null}
-                </div>
-            </div>
-
-            {/* ── Two-panel body ── */}
-            <div className="flex flex-1 min-h-0 overflow-hidden bg-white">
-                {/* ── Left: search + filters + list ── */}
-                {showList && (
-                    <div className="w-[340px] flex-shrink-0 flex flex-col border-r border-[#0D0D0D]/10 bg-white overflow-hidden transition-all">
-                    <div className="flex-shrink-0 px-3 py-2.5 border-b border-[#0D0D0D]/8">
-                        <div className="relative">
-                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#0D0D0D]/30" />
-                            <Input
-                                placeholder="Buscar solicitudes…"
-                                value={query}
-                                onChange={(e) => setQuery(e.target.value)}
-                                className="rounded-none border-[#0D0D0D]/12 pl-8 h-8 text-xs focus-visible:ring-0 focus-visible:border-[#012340]/40 bg-[#0D0D0D]/[0.02]"
-                            />
-                        </div>
-                    </div>
-
-                    <div ref={filtroRef} className="flex-shrink-0 px-3 py-2 border-b border-[#0D0D0D]/8 relative">
-                        <button
-                            onClick={() => setFiltroOpen((o) => !o)}
-                            className="flex items-center gap-2 h-7 px-3 w-full border border-[#0D0D0D]/12 bg-white text-[11px] font-semibold text-[#0D0D0D]/70 hover:border-[#012340]/40 transition-colors"
-                        >
-                            <span className="flex-1 text-left">
-                                {FILTROS.find((f) => f.id === filtro)?.label ?? "Todos"}
-                                <span className="ml-1.5 text-[10px] font-bold text-[#0D0D0D]/40">
-                                    {conteoPorEstado.get(filtro) ?? 0}
-                                </span>
-                            </span>
-                            <ChevronDown className={`h-3.5 w-3.5 text-[#0D0D0D]/35 transition-transform ${filtroOpen ? "rotate-180" : ""}`} />
-                        </button>
-
-                        {filtroOpen && (
-                            <div className="absolute left-3 right-3 top-full mt-0.5 z-20 bg-white border border-[#0D0D0D]/12 shadow-lg">
-                                {FILTROS.map((f) => (
-                                    <button
-                                        key={f.id}
-                                        onClick={() => { setFiltro(f.id); setFiltroOpen(false); }}
-                                        className={`w-full flex items-center justify-between px-3 py-2 text-[11px] font-semibold transition-colors ${filtro === f.id
-                                            ? "bg-[#012340] text-white"
-                                            : "text-[#0D0D0D]/65 hover:bg-[#0D0D0D]/[0.04]"
-                                            }`}
-                                    >
-                                        {f.label}
-                                        <span className={`text-[10px] font-bold ${filtro === f.id ? "opacity-70" : "opacity-40"}`}>
-                                            {conteoPorEstado.get(f.id) ?? 0}
-                                        </span>
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-[#0D0D0D]/10">
-                        {loading ? (
-                            <div className="flex flex-col">
-                                {Array.from({ length: 8 }).map((_, i) => (
-                                    <div key={i} className="px-4 py-3 border-b border-[#0D0D0D]/5 animate-pulse">
-                                        <div className="flex items-center justify-between mb-1.5">
-                                            <div className="flex items-center gap-1.5">
-                                                <div className="h-1.5 w-1.5 rounded-full bg-[#0D0D0D]/12 flex-shrink-0" />
-                                                <div className="h-3 bg-[#0D0D0D]/8 rounded" style={{ width: 120 }} />
-                                            </div>
-                                            <div className="h-2.5 bg-[#0D0D0D]/8 rounded" style={{ width: 36 }} />
-                                        </div>
-                                        <div className="h-2 bg-[#0D0D0D]/6 rounded ml-3 mb-1.5" style={{ width: 100 }} />
-                                        <div className="flex items-center justify-between ml-3">
-                                            <div className="h-2.5 bg-[#0D0D0D]/6 rounded" style={{ width: 90 }} />
-                                            <div className="h-2.5 bg-[#0D0D0D]/6 rounded" style={{ width: 48 }} />
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : pageRows.length === 0 ? (
-                            <div className="py-16 px-4 text-center flex flex-col items-center gap-3">
-                                <Inbox className="h-6 w-6 text-[#0D0D0D]/20" />
-                                <p className="text-sm font-semibold text-[#0D0D0D]/50">Sin resultados</p>
-                                <p className="text-[11px] text-[#0D0D0D]/35">Intenta con otro filtro o búsqueda</p>
-                            </div>
-                        ) : (
-                            pageRows.map((s) => {
-                                const selected = s.radicado === selectedRadicado;
-                                return (
-                                    <button
-                                        key={s.radicado}
-                                        onClick={() => setSelectedRadicado(selected ? null : s.radicado)}
-                                        className={`w-full text-left px-4 py-3 border-b border-[#0D0D0D]/5 transition-colors border-l-2 ${selected
-                                            ? "bg-[#012340]/[0.05] border-l-[#012340]"
-                                            : "border-l-transparent hover:bg-[#0D0D0D]/[0.02]"
-                                            }`}
-                                    >
-                                        <div className="flex items-center justify-between gap-2 mb-0.5">
-                                            <div className="flex items-center gap-1.5 min-w-0">
-                                                <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${ESTADO_DOT[s.estado]}`} />
-                                                <span className={`text-[13px] truncate ${!s.gestionado ? "font-semibold text-[#012340]" : "font-normal text-[#0D0D0D]/60"}`}>
-                                                    {s.solicitante}
-                                                </span>
-                                            </div>
-                                            <span className="text-[10px] text-[#0D0D0D]/35 flex-shrink-0">
-                                                {formatFechaCorta(s.fecha)}
-                                            </span>
-                                        </div>
-                                        <p className="font-mono text-[10px] text-[#0D0D0D]/40 truncate pl-3 mb-0.5">
-                                            {s.radicado}
-                                        </p>
-                                        <div className="flex items-center justify-between gap-2 pl-3">
-                                            <span className="text-[11px] text-[#0D0D0D]/45 truncate">
-                                                CC {s.cedula} · {formatCurrency(s.valor)}
-                                            </span>
-                                            <span className={`text-[10px] font-semibold flex-shrink-0 ${selected ? "text-[#012340]" : "text-[#0D0D0D]/35"}`}>
-                                                {ESTADO_LABEL[s.estado]}
-                                            </span>
-                                        </div>
-                                    </button>
-                                );
-                            })
-                        )}
-                    </div>
-
-                    {!loading && filtradas.length > PAGE_SIZE && (
-                        <div className="flex-shrink-0 border-t border-[#0D0D0D]/10 px-3 py-2 flex items-center justify-between">
-                            <span className="text-[10px] text-[#0D0D0D]/40">
-                                {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, filtradas.length)} de {filtradas.length}
-                            </span>
-                            <div className="flex gap-1">
-                                <button
-                                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                                    disabled={safePage <= 1}
-                                    className="h-6 w-6 flex items-center justify-center border border-[#0D0D0D]/12 text-[#0D0D0D]/50 hover:border-[#012340] hover:text-[#012340] disabled:opacity-30 disabled:cursor-not-allowed text-xs"
-                                >
-                                    ‹
-                                </button>
-                                <button
-                                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                                    disabled={safePage >= totalPages}
-                                    className="h-6 w-6 flex items-center justify-center border border-[#0D0D0D]/12 text-[#0D0D0D]/50 hover:border-[#012340] hover:text-[#012340] disabled:opacity-30 disabled:cursor-not-allowed text-xs"
-                                >
-                                    ›
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-                )}
-
-                {/* ── Right: detail ── */}
-                <div className="flex-1 min-w-0 overflow-hidden">
-                    {seleccionada ? (
-                        <RequestDetail
-                            solicitud={seleccionada}
-                            activeTab={activeTab}
-                            onGestionar={mode === "admin" && !seleccionada.gestionado ? () => handleGestionar(seleccionada.radicado) : undefined}
-                        />
-                    ) : (
-                        <div className="h-full flex flex-col items-center justify-center gap-3 text-[#0D0D0D]/25">
-                            <Inbox className="h-10 w-10" />
-                            <p className="text-sm font-medium">Selecciona una solicitud</p>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {modalOpen && seleccionada && (
-                <RequestDetailModal
-                    solicitud={seleccionada}
-                    initialTab={activeTab}
-                    onClose={() => setModalOpen(false)}
-                    onGestionar={!seleccionada.gestionado ? () => handleGestionar(seleccionada.radicado) : undefined}
-                />
-            )}
-
-            {confirmRadicado && (
-                <div
-                    className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-4"
-                    onClick={(e) => { if (e.target === e.currentTarget && !gestionando) setConfirmRadicado(null); }}
-                >
-                    <div className="w-full max-w-sm bg-white border border-[#0D0D0D]/15 shadow-2xl">
-                        <div className="border-b border-[#0D0D0D]/10 px-5 py-4">
-                            <p className="text-[10px] font-bold tracking-[0.18em] uppercase text-[#0D0D0D]/40">Confirmar acción</p>
-                            <h3 className="mt-1 text-sm font-bold text-[#012340]">Marcar como Gestionado</h3>
-                        </div>
-                        <div className="px-5 py-4 space-y-3">
-                            <p className="text-sm text-[#0D0D0D]/70">¿Confirmas que esta solicitud ya fue atendida?</p>
-                            {confirmSolicitud && (
-                                <div className="border border-[#0D0D0D]/10 bg-[#0D0D0D]/[0.02] p-3 space-y-1">
-                                    <p className="text-xs"><span className="font-medium text-[#0D0D0D]/45">Solicitante:</span> <span className="text-[#0D0D0D]/80">{confirmSolicitud.solicitante}</span></p>
-                                    <p className="text-xs"><span className="font-medium text-[#0D0D0D]/45">Cédula:</span> <span className="text-[#0D0D0D]/80">{confirmSolicitud.cedula}</span></p>
-                                    <p className="text-xs"><span className="font-medium text-[#0D0D0D]/45">Radicado:</span> <span className="font-mono text-[#0D0D0D]/80">{confirmSolicitud.radicado}</span></p>
-                                </div>
-                            )}
-                            <p className="text-xs text-[#0D0D0D]/40">La solicitud pasará a Gestionadas. Esta acción no se puede deshacer.</p>
-                        </div>
-                        <div className="border-t border-[#0D0D0D]/10 px-5 py-3 flex justify-end gap-2">
-                            <Button variant="outline" onClick={() => setConfirmRadicado(null)} disabled={gestionando}
-                                className="rounded-none border-[#0D0D0D]/15 h-8 px-4 text-[11px] font-semibold">
-                                Cancelar
-                            </Button>
-                            <Button onClick={handleConfirmGestionar} disabled={gestionando}
-                                className="rounded-none bg-[#012340] hover:bg-[#012340]/90 text-white h-8 px-4 text-[11px] font-semibold">
-                                {gestionando ? "Guardando…" : "Confirmar"}
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
+  return (
+    <div className="flex flex-col -m-4 sm:-m-6 lg:-m-8 h-[calc(100%+2rem)] sm:h-[calc(100%+3rem)] lg:h-[calc(100%+4rem)]">
+      {/* ── Top bar ── */}
+      <div className="flex items-center justify-between gap-4 px-4 sm:px-6 py-3 border-b border-[#0D0D0D]/10 bg-white flex-shrink-0">
+        <div>
+          <h2 className="text-sm font-bold text-[#012340]">
+            {mode === "admin" ? "Bandeja de solicitudes" : "Mis solicitudes"}
+          </h2>
+          <p className="text-[11px] text-[#0D0D0D]/40">
+            {loading
+              ? "Cargando…"
+              : `${solicitudes.length} solicitudes cargadas`}
+          </p>
         </div>
-    );
+        <div className="flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="h-7 w-7 inline-flex items-center justify-center rounded-md text-[#0D0D0D]/45 hover:text-[#012340] hover:bg-[#0D0D0D]/5 data-[state=open]:bg-[#012340] data-[state=open]:text-white transition-colors"
+                title="Más acciones"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="rounded-md min-w-[170px] data-[state=open]:slide-in-from-top-1"
+            >
+              {seleccionada && !seleccionada.gestionado && (
+                <DropdownMenuItem
+                  onClick={() => handleGestionar(seleccionada.radicado)}
+                  className="text-[11px] font-semibold cursor-pointer"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Marcar como Gestionado
+                </DropdownMenuItem>
+              )}
+              {seleccionada && (
+                <DropdownMenuItem
+                  onClick={() => setModalOpen(true)}
+                  className="text-[11px] font-semibold cursor-pointer"
+                >
+                  <Maximize2 className="h-3.5 w-3.5" /> Expandir
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="text-[11px] font-semibold cursor-pointer"
+              >
+                <RefreshCw
+                  className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`}
+                />{" "}
+                Actualizar
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleExportCSV}
+                className="text-[11px] font-semibold cursor-pointer"
+              >
+                <Download className="h-3.5 w-3.5" /> Exportar CSV
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+
+      {/* ── Error ── */}
+      {error && (
+        <div className="flex-shrink-0 border-b border-red-200 bg-red-50 px-6 py-2 text-xs text-red-700 flex items-center gap-2">
+          <span className="font-semibold">Error:</span> {error}
+        </div>
+      )}
+
+      {/* ── Shared control row: toggle (left) + tabs (right) ── */}
+      <div className="flex items-stretch border-b border-[#0D0D0D]/10 bg-white flex-shrink-0">
+        {showList && (
+          <div className="w-[340px] flex-shrink-0 flex border-r border-[#0D0D0D]/10 transition-all">
+            <button
+              onClick={() => setVistaGestionados(false)}
+              className={`flex-1 py-2.5 text-[11px] font-semibold tracking-wide transition-all ${!vistaGestionados ? "bg-[#012340] text-white" : "text-[#0D0D0D]/50 hover:text-[#0D0D0D]/80"}`}
+            >
+              Activas{" "}
+              <span
+                className={`ml-1 text-[10px] font-bold ${!vistaGestionados ? "opacity-70" : "opacity-40"}`}
+              >
+                {totalActivas}
+              </span>
+            </button>
+            <div className="w-px bg-[#0D0D0D]/10" />
+            <button
+              onClick={() => setVistaGestionados(true)}
+              className={`flex-1 py-2.5 text-[11px] font-semibold tracking-wide transition-all ${vistaGestionados ? "bg-[#012340] text-white" : "text-[#0D0D0D]/50 hover:text-[#0D0D0D]/80"}`}
+            >
+              Gestionadas{" "}
+              <span
+                className={`ml-1 text-[10px] font-bold ${vistaGestionados ? "opacity-70" : "opacity-40"}`}
+              >
+                {totalGestionadas}
+              </span>
+            </button>
+          </div>
+        )}
+        <div className="flex-1 flex items-center justify-between px-2">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowList(!showList)}
+              className="p-1.5 text-[#0D0D0D]/40 hover:text-[#012340] hover:bg-[#0D0D0D]/5 rounded-md transition-colors"
+              title={showList ? "Ocultar lista" : "Mostrar lista"}
+            >
+              {showList ? (
+                <PanelLeftClose className="h-4 w-4" />
+              ) : (
+                <PanelLeft className="h-4 w-4" />
+              )}
+            </button>
+            {seleccionada && (
+              <ModalTabs active={activeTab} onChange={setActiveTab} />
+            )}
+          </div>
+          {lastUpdated && (
+            <span className="text-[10px] text-[#0D0D0D]/35 pr-1">
+              Actualizado{" "}
+              {lastUpdated.toLocaleTimeString("es-CO", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* ── Two-panel body ── */}
+      <div className="flex flex-1 min-h-0 overflow-hidden bg-white">
+        {/* ── Panel de filtros empotrado (empuja la lista) ── */}
+        {showList && (
+          <BandejaFiltros
+            open={filtroOpen}
+            filtro={filtro}
+            conteoPorEstado={conteoPorEstado}
+            filtrosActivos={filtrosActivos}
+            onFiltroChange={setFiltro}
+            onLimpiar={handleLimpiarFiltros}
+            onClose={() => setFiltroOpen(false)}
+          />
+        )}
+
+        {/* ── Left: search + list ── */}
+        {showList && (
+          <div className="w-[340px] flex-shrink-0 flex flex-col border-r border-[#0D0D0D]/10 bg-white overflow-hidden transition-all">
+            <div className="flex-shrink-0 px-3 py-2.5 border-b border-[#0D0D0D]/8 space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#0D0D0D]/30" />
+                  <Input
+                    placeholder="Buscar solicitudes…"
+                    value={rawQuery}
+                    onChange={(e) => setRawQuery(e.target.value)}
+                    className="rounded-none border-[#0D0D0D]/12 pl-8 h-8 text-xs focus-visible:ring-0 focus-visible:border-[#012340]/40 bg-[#0D0D0D]/[0.02]"
+                  />
+                </div>
+                <button
+                  onClick={() => setFiltroOpen((o) => !o)}
+                  title="Filtros"
+                  className={`relative h-8 w-8 flex-shrink-0 inline-flex items-center justify-center border transition-colors ${
+                    filtroOpen || filtrosActivos > 0
+                      ? "border-[#012340] bg-[#012340] text-white"
+                      : "border-[#0D0D0D]/12 text-[#0D0D0D]/55 hover:border-[#012340]/40 hover:text-[#012340]"
+                  }`}
+                >
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                  {filtrosActivos > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 h-3.5 min-w-3.5 px-0.5 flex items-center justify-center rounded-full bg-[#F29A2E] text-white text-[9px] font-bold leading-none">
+                      {filtrosActivos}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {/* Chips de filtros activos */}
+              {filtrosActivos > 0 && (
+                <div className="flex items-center flex-wrap gap-1.5">
+                  <span className="inline-flex items-center gap-1 h-5 pl-2 pr-1 bg-[#012340]/[0.06] border border-[#012340]/15 text-[10px] font-semibold text-[#012340]">
+                    {FILTROS.find((f) => f.id === filtro)?.label}
+                    <button
+                      onClick={handleLimpiarFiltros}
+                      className="inline-flex items-center justify-center h-3.5 w-3.5 rounded-full hover:bg-[#012340]/15 transition-colors"
+                      title="Quitar filtro"
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                  </span>
+                  <button
+                    onClick={handleLimpiarFiltros}
+                    className="text-[10px] font-semibold text-[#0D0D0D]/45 hover:text-[#012340] transition-colors"
+                  >
+                    Limpiar
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
+              {loading ? (
+                <div className="flex flex-col">
+                  {SKELETON_ROWS.map((i) => (
+                    <div
+                      key={i}
+                      className="px-4 py-3 border-b border-[#0D0D0D]/5 animate-pulse"
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <div className="h-1.5 w-1.5 rounded-full bg-[#0D0D0D]/12 flex-shrink-0" />
+                          <div
+                            className="h-3 bg-[#0D0D0D]/8 rounded"
+                            style={{ width: 120 }}
+                          />
+                        </div>
+                        <div
+                          className="h-2.5 bg-[#0D0D0D]/8 rounded"
+                          style={{ width: 36 }}
+                        />
+                      </div>
+                      <div
+                        className="h-2 bg-[#0D0D0D]/6 rounded ml-3 mb-1.5"
+                        style={{ width: 100 }}
+                      />
+                      <div className="flex items-center justify-between ml-3">
+                        <div
+                          className="h-2.5 bg-[#0D0D0D]/6 rounded"
+                          style={{ width: 90 }}
+                        />
+                        <div
+                          className="h-2.5 bg-[#0D0D0D]/6 rounded"
+                          style={{ width: 48 }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : pageRows.length === 0 ? (
+                <div className="py-16 px-4 text-center flex flex-col items-center gap-3">
+                  <Inbox className="h-6 w-6 text-[#0D0D0D]/20" />
+                  <p className="text-sm font-semibold text-[#0D0D0D]/50">
+                    Sin resultados
+                  </p>
+                  <p className="text-[11px] text-[#0D0D0D]/35">
+                    Intenta con otro filtro o búsqueda
+                  </p>
+                </div>
+              ) : (
+                pageRows.map((s) => {
+                  const selected = s.radicado === selectedRadicado;
+                  return (
+                    <button
+                      key={s.radicado}
+                      onClick={() =>
+                        setSelectedRadicado(selected ? null : s.radicado)
+                      }
+                      className={`w-full text-left px-4 py-3 border-b border-[#0D0D0D]/5 transition-colors border-l-2 ${
+                        selected
+                          ? "bg-[#012340]/[0.05] border-l-[#012340]"
+                          : "border-l-transparent hover:bg-[#0D0D0D]/[0.02]"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-0.5">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${ESTADO_DOT[s.estado]}`}
+                          />
+                          <span
+                            className={`text-[13px] truncate ${!s.gestionado ? "font-semibold text-[#012340]" : "font-normal text-[#0D0D0D]/60"}`}
+                          >
+                            {s.solicitante}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-[#0D0D0D]/35 flex-shrink-0">
+                          {formatFechaCorta(s.fecha)}
+                        </span>
+                      </div>
+                      <p className="font-mono text-[10px] text-[#0D0D0D]/40 truncate pl-3 mb-0.5">
+                        {s.radicado}
+                      </p>
+                      <div className="flex items-center justify-between gap-2 pl-3">
+                        <span className="text-[11px] text-[#0D0D0D]/45 truncate">
+                          CC {s.cedula} · {formatCurrency(s.valor)}
+                        </span>
+                        <span
+                          className={`flex-shrink-0 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide border ${ESTADO_BADGE[s.estado]}`}
+                        >
+                          {ESTADO_LABEL[s.estado]}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            {!loading && filtradas.length > PAGE_SIZE && (
+              <div className="flex-shrink-0 border-t border-[#0D0D0D]/10 px-3 py-2 flex items-center justify-between">
+                <span className="text-[10px] text-[#0D0D0D]/40">
+                  {pageStart + 1}–
+                  {Math.min(pageStart + PAGE_SIZE, filtradas.length)} de{" "}
+                  {filtradas.length}
+                </span>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={safePage <= 1}
+                    className="h-6 w-6 flex items-center justify-center border border-[#0D0D0D]/12 text-[#0D0D0D]/50 hover:border-[#012340] hover:text-[#012340] disabled:opacity-30 disabled:cursor-not-allowed text-xs"
+                  >
+                    ‹
+                  </button>
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={safePage >= totalPages}
+                    className="h-6 w-6 flex items-center justify-center border border-[#0D0D0D]/12 text-[#0D0D0D]/50 hover:border-[#012340] hover:text-[#012340] disabled:opacity-30 disabled:cursor-not-allowed text-xs"
+                  >
+                    ›
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Right: detail ── */}
+        <div className="flex-1 min-w-0 overflow-hidden">
+          {seleccionada ? (
+            detailLoading ? (
+              <LoadingScreen message="Cargando detalle…" fullScreen={false} />
+            ) : detailError ? (
+              <div className="h-full flex flex-col items-center justify-center gap-2 text-center px-8">
+                <X className="h-8 w-8 text-red-400" />
+                <p className="text-sm font-semibold text-[#0D0D0D]/70">
+                  No se pudo cargar el detalle
+                </p>
+                <p className="text-[11px] text-[#0D0D0D]/45">{detailError}</p>
+                <button
+                  onClick={() => {
+                    const r = selectedRadicado;
+                    setSelectedRadicado(null);
+                    setSelectedRadicado(r);
+                  }}
+                  className="mt-2 h-7 px-3 text-[11px] font-semibold border border-[#0D0D0D]/15 hover:border-[#012340] hover:text-[#012340] transition-colors"
+                >
+                  Reintentar
+                </button>
+              </div>
+            ) : selectedDetail ? (
+              <RequestDetail
+                solicitud={selectedDetail}
+                activeTab={activeTab}
+                onGestionar={
+                  mode === "admin" && !selectedDetail.gestionado
+                    ? () => handleGestionar(selectedDetail.radicado)
+                    : undefined
+                }
+              />
+            ) : (
+              <LoadingScreen message="Cargando detalle…" fullScreen={false} />
+            )
+          ) : (
+            <div className="flex flex-col items-center justify-center min-h-[320px] h-full px-8 py-10 gap-0">
+              <Image
+                src="/bandeja.png"
+                alt="Selecciona una solicitud"
+                width={340}
+                height={340}
+                className="select-none pointer-events-none"
+                priority
+              />
+              <div className="flex flex-col items-center gap-2 text-center -mt-12">
+                <p className="text-xl font-normal text-[#0D0D0D]/80 tracking-tight">
+                  Selecciona una solicitud
+                </p>
+                <p className="text-sm text-[#0D0D0D]/50 max-w-[360px] leading-relaxed">
+                  Elige una solicitud de la lista para ver su detalle, campos y
+                  documentos.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {modalOpen && selectedDetail && (
+        <RequestDetailModal
+          solicitud={selectedDetail}
+          initialTab={activeTab}
+          onClose={() => setModalOpen(false)}
+          onGestionar={
+            !selectedDetail.gestionado
+              ? () => handleGestionar(selectedDetail.radicado)
+              : undefined
+          }
+        />
+      )}
+
+      {confirmRadicado && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-4 duration-200 animate-in fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !gestionando)
+              setConfirmRadicado(null);
+          }}
+        >
+          <div className="w-full max-w-sm border border-l-4 border-[#0D0D0D]/15 border-l-[#012340] bg-white shadow-2xl duration-200 animate-in zoom-in-95">
+            <div className="border-b border-[#0D0D0D]/10 px-5 py-4">
+              <Image
+                src="/Imagen1.png"
+                alt="WANT N' Get"
+                width={140}
+                height={42}
+                className="mb-3 h-6 w-auto object-contain"
+                priority
+              />
+              <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-[#0D0D0D]/40">
+                <CheckCircle2 className="h-4 w-4 text-[#012340]" aria-hidden />
+                Confirmar acción
+              </p>
+              <h3 className="mt-1.5 text-sm font-bold text-[#012340]">
+                Marcar como Gestionado
+              </h3>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <p className="text-sm text-[#0D0D0D]/70">
+                ¿Confirmas que esta solicitud ya fue atendida?
+              </p>
+              {confirmSolicitud && (
+                <div className="border border-[#0D0D0D]/10 bg-[#0D0D0D]/[0.02] p-3 space-y-1">
+                  <p className="text-xs">
+                    <span className="font-medium text-[#0D0D0D]/45">
+                      Solicitante:
+                    </span>{" "}
+                    <span className="text-[#0D0D0D]/80">
+                      {confirmSolicitud.solicitante}
+                    </span>
+                  </p>
+                  <p className="text-xs">
+                    <span className="font-medium text-[#0D0D0D]/45">
+                      Cédula:
+                    </span>{" "}
+                    <span className="text-[#0D0D0D]/80">
+                      {confirmSolicitud.cedula}
+                    </span>
+                  </p>
+                  <p className="text-xs">
+                    <span className="font-medium text-[#0D0D0D]/45">
+                      Radicado:
+                    </span>{" "}
+                    <span className="font-mono text-[#0D0D0D]/80">
+                      {confirmSolicitud.radicado}
+                    </span>
+                  </p>
+                </div>
+              )}
+              <p className="text-xs text-[#0D0D0D]/40">
+                La solicitud pasará a Gestionadas. Esta acción no se puede
+                deshacer.
+              </p>
+            </div>
+            <div className="border-t border-[#0D0D0D]/10 px-5 py-3 flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setConfirmRadicado(null)}
+                disabled={gestionando}
+                className="rounded-none border-[#0D0D0D]/15 h-8 px-4 text-[11px] font-semibold"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleConfirmGestionar}
+                disabled={gestionando}
+                className="rounded-none bg-[#012340] hover:bg-[#012340]/90 text-white h-8 px-4 text-[11px] font-semibold"
+              >
+                {gestionando ? "Guardando…" : "Confirmar"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function formatCurrency(v: number): string {
-    if (!Number.isFinite(v)) return "$0";
-    return "$" + new Intl.NumberFormat("es-CO").format(Math.round(v));
+  if (!Number.isFinite(v) || v === 0) return "$0";
+  return "$" + COP_FORMATTER.format(Math.round(v));
 }
 
 function formatFechaCorta(iso: string): string {
-    if (!iso) return "—";
-    const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (!m) return iso;
-    const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-    return `${parseInt(m[3])} ${meses[parseInt(m[2]) - 1]}`;
+  if (!iso) return "—";
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return iso;
+  const meses = [
+    "ene",
+    "feb",
+    "mar",
+    "abr",
+    "may",
+    "jun",
+    "jul",
+    "ago",
+    "sep",
+    "oct",
+    "nov",
+    "dic",
+  ];
+  return `${parseInt(m[3])} ${meses[parseInt(m[2]) - 1]}`;
 }

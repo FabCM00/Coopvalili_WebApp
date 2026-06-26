@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
+import { withPrismaRetry } from "@/lib/prisma-retry";
 import { generateSecureToken, expiresIn, TOKEN_EXPIRY } from "@/lib/tokens";
 import { sendInvitationEmail } from "@/lib/mailer";
 import { isRateLimited } from "@/lib/rate-limit";
@@ -62,10 +63,12 @@ export async function POST(req: NextRequest) {
   const normalizedEmail = email.toLowerCase().trim();
 
   // 4. Verificar que no exista una cuenta ya activa
-  const existing = await prisma.user.findUnique({
-    where: { email: normalizedEmail },
-    select: { id: true, active: true },
-  });
+  const existing = await withPrismaRetry(() =>
+    prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      select: { id: true, active: true },
+    }),
+  );
 
   if (existing?.active) {
     return NextResponse.json(
@@ -75,23 +78,27 @@ export async function POST(req: NextRequest) {
   }
 
   // 5. Invalidar invitaciones anteriores al mismo correo
-  await prisma.invitationToken.updateMany({
-    where: { email: normalizedEmail, accepted: false },
-    data: { accepted: true },
-  });
+  await withPrismaRetry(() =>
+    prisma.invitationToken.updateMany({
+      where: { email: normalizedEmail, accepted: false },
+      data: { accepted: true },
+    }),
+  );
 
   // 6. Crear token de invitación
   const token = generateSecureToken();
 
-  await prisma.invitationToken.create({
-    data: {
-      email: normalizedEmail,
-      token,
-      role,
-      invitedById: session.user.id,
-      expiresAt: expiresIn(TOKEN_EXPIRY.INVITATION_MIN),
-    },
-  });
+  await withPrismaRetry(() =>
+    prisma.invitationToken.create({
+      data: {
+        email: normalizedEmail,
+        token,
+        role,
+        invitedById: session.user.id,
+        expiresAt: expiresIn(TOKEN_EXPIRY.INVITATION_MIN),
+      },
+    }),
+  );
 
   // 7. Enviar email de invitación (fire-and-forget)
   sendInvitationEmail(

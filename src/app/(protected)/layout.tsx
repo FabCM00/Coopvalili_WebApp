@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Navbar } from "@/components/layout/Navbar";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { useProtectedRoute } from "@/hooks/use-protected-route";
+import { NotificationProvider } from "@/contexts/NotificationContext";
 
 const pageTitles: Record<string, { title: string; subtitle?: string }> = {
     "/admin": { title: "Dashboard", subtitle: "Panel de administración" },
@@ -42,11 +43,13 @@ export default function ProtectedLayout({
     const pageInfo = pageTitles[pathname] || { title: "" };
 
     return (
-        <div className="flex h-[100dvh] w-full flex-col bg-background">
-            <Navbar role={profile.role} title={pageInfo.title} subtitle={pageInfo.subtitle} />
-            <main className="flex-1 min-h-0 w-full max-w-9xl mx-auto overflow-y-auto p-4 sm:p-6 lg:p-8">
-                {children}
-            </main>
-        </div>
+        <NotificationProvider>
+            <div className="flex h-[100dvh] w-full flex-col bg-background">
+                <Navbar role={profile.role} title={pageInfo.title} subtitle={pageInfo.subtitle} />
+                <main className="flex-1 min-h-0 w-full max-w-9xl mx-auto overflow-y-auto p-4 sm:p-6 lg:p-8">
+                    {children}
+                </main>
+            </div>
+        </NotificationProvider>
     );
 }

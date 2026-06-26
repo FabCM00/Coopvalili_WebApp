@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { withPrismaRetry } from "@/lib/prisma-retry";
 
 const schema = z.object({ email: z.string().email() });
 
@@ -17,10 +18,12 @@ export async function POST(req: NextRequest) {
   const parsed = schema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ inactive: false });
 
-  const user = await prisma.user.findUnique({
-    where: { email: parsed.data.email.toLowerCase().trim() },
-    select: { active: true, passwordHash: true },
-  });
+  const user = await withPrismaRetry(() =>
+    prisma.user.findUnique({
+      where: { email: parsed.data.email.toLowerCase().trim() },
+      select: { active: true, passwordHash: true },
+    }),
+  );
 
   // Solo informa "inactivo" si el usuario ya configuró su contraseña pero fue desactivado
   const inactive = !!(user?.passwordHash && !user.active);

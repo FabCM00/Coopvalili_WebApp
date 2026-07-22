@@ -1,6 +1,11 @@
 "use client";
 
-import { type SolicitudUI, type SolicitudEstado } from "@/lib/bandeja";
+import {
+  type SolicitudUI,
+  ESTADO_LABEL,
+  ESTADO_BADGE,
+  ESTADO_BORDER,
+} from "@/lib/bandeja";
 import { X } from "lucide-react";
 
 export type DetailModalTab = "campos" | "motor_json" | "documentos";
@@ -11,83 +16,28 @@ interface ModalHeaderProps {
   onGestionar?: () => void;
 }
 
-const ESTADO_LABEL: Record<SolicitudEstado, string> = {
-  valida_1: "Valida 1",
-  no_valida_1: "No valida 1",
-  val_identidad: "Val. identidad",
-  no_val_identidad: "No val. identidad",
-  fallo_servicios: "Fallo en servicios",
-  no_viable: "No viable",
-  aprobado: "Aprobado",
-  revision: "Revisión",
-};
-
-const ESTADO_STYLE: Record<SolicitudEstado, { border: string; badge: string }> =
-  {
-    valida_1: {
-      border: "border-l-cyan-500",
-      badge: "bg-cyan-100 text-cyan-700 border-cyan-200",
-    },
-    no_valida_1: {
-      border: "border-l-red-500",
-      badge: "bg-red-100 text-red-700 border-red-200",
-    },
-    val_identidad: {
-      border: "border-l-sky-500",
-      badge: "bg-sky-100 text-sky-700 border-sky-200",
-    },
-    no_val_identidad: {
-      border: "border-l-red-500",
-      badge: "bg-red-100 text-red-700 border-red-200",
-    },
-    fallo_servicios: {
-      border: "border-l-purple-500",
-      badge: "bg-purple-100 text-purple-700 border-purple-200",
-    },
-    no_viable: {
-      border: "border-l-orange-500",
-      badge: "bg-orange-100 text-orange-700 border-orange-200",
-    },
-    aprobado: {
-      border: "border-l-green-500",
-      badge: "bg-green-100 text-green-700 border-green-200",
-    },
-    revision: {
-      border: "border-l-amber-400",
-      badge: "bg-amber-100 text-amber-700 border-amber-200",
-    },
-  };
-
 export function ModalHeader({
   solicitud,
   onClose,
   onGestionar,
 }: ModalHeaderProps) {
-  const style = solicitud.sinMotor
-    ? {
-        border: "border-l-amber-400",
-        badge: "bg-amber-100 text-amber-700 border-amber-200",
-      }
-    : ESTADO_STYLE[solicitud.estado];
-  const badgeLabel = solicitud.sinMotor
-    ? "Sin motor"
-    : ESTADO_LABEL[solicitud.estado];
+  const border = ESTADO_BORDER[solicitud.estado];
+  const badge = ESTADO_BADGE[solicitud.estado];
+  const badgeLabel = ESTADO_LABEL[solicitud.estado];
 
   return (
     <div
-      className={`border-b border-[#0D0D0D]/10 border-l-4 ${style.border} px-4 py-3 flex items-center justify-between gap-4 flex-shrink-0 bg-white`}
+      className={`border-b border-[#0D0D0D]/10 border-l-4 ${border} px-4 py-3 flex items-center justify-between gap-4 flex-shrink-0 bg-white`}
     >
       <div className="flex-1 min-w-0">
         {/* Estado + decisión */}
         <div className="flex items-center gap-2 mb-2">
           <span
-            className={`text-[10px] font-bold px-2 py-0.5 border ${style.badge}`}
+            className={`text-[10px] font-bold px-2 py-0.5 border ${badge}`}
           >
             {badgeLabel}
           </span>
-          <h2 className="text-sm font-bold text-[#012340] truncate">
-            {solicitud.decisionTexto}
-          </h2>
+        
         </div>
 
         {/* Nombre */}

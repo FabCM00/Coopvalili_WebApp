@@ -413,10 +413,6 @@ export function ResumenSolicitud({ solicitud }: { solicitud: SolicitudUI }) {
         <CriterioRow label="Validación Edad" value={v1.valida_edad} />
         <CriterioRow label="Validación Activo" value={v1.valida_activo} />
         <CriterioRow label="Validación Asociado" value={v1.valida_asociado} />
-        <CriterioRow
-          label="Validación No Retirado"
-          value={v1.valida_no_retirado}
-        />
       </Section>
 
       <Section title="Identidad — Validación documental y facial">
@@ -488,13 +484,6 @@ export function ResumenSolicitud({ solicitud }: { solicitud: SolicitudUI }) {
           </p>
         )}
       </Section>
-
-      <Section title="Servicio externo — CoproCenva">
-        <p className="px-4 py-3 text-xs text-[#0D0D0D]/30 italic">
-          Sin datos de envío a CoproCenva.
-        </p>
-      </Section>
-
       <Section title="Motivos no apto">
         {v1.mensaje && v1.valida1 !== 1 ? (
           <div className="flex items-start gap-2.5 px-4 py-3 bg-red-50">

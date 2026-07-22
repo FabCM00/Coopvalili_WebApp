@@ -1,21 +1,22 @@
 "use client";
 
 import { useEffect } from "react";
-import { SlidersHorizontal, X, FilterX } from "lucide-react";
+import { SlidersHorizontal, X, FilterX, Info } from "lucide-react";
 import type { SolicitudEstado } from "@/lib/bandeja";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 
 export type FiltroTab = "todos" | SolicitudEstado;
 
-export const FILTROS: { id: FiltroTab; label: string }[] = [
+export const FILTROS: { id: FiltroTab; label: string; regla?: string }[] = [
   { id: "todos", label: "Todos" },
-  { id: "valida_1", label: "Valida 1" },
-  { id: "no_valida_1", label: "No valida 1" },
-  { id: "val_identidad", label: "Val. identidad" },
-  { id: "no_val_identidad", label: "No val. identidad" },
-  { id: "fallo_servicios", label: "Fallo en servicios" },
-  { id: "no_viable", label: "No viable" },
-  { id: "aprobado", label: "Aprobado" },
-  { id: "revision", label: "Revisión" },
+  { id: "valida_1", label: "Valida 1", regla: "Aprobó la Validación 1." },
+  { id: "no_valida_1", label: "No Valida 1", regla: "No aprobó la Validación 1." },
+  { id: "val_identidad", label: "Val Identidad", regla: "Validó identidad: rostro y documento OK." },
+  { id: "no_val_identidad", label: "No Val Identidad", regla: "Falló la validación de rostro o documento." },
+  { id: "fallo_servicios", label: "Fallo Servicios", regla: "El motor respondió con error de servicio." },
+  { id: "no_viable", label: "No viable", regla: "El motor decidió: no viable." },
+  { id: "aprobado", label: "Aprobado", regla: "El motor decidió: aprobado." },
+  { id: "revision", label: "Revisión", regla: "No aplicó ninguna regla anterior; pendiente de revisión." },
 ];
 
 interface BandejaFiltrosProps {
@@ -76,9 +77,11 @@ export function BandejaFiltros({
           <p className="px-1 mb-1.5 text-[10px] font-bold tracking-[0.14em] uppercase text-[#0D0D0D]/35">
             Estado
           </p>
+          <TooltipProvider>
           <div className="flex flex-col gap-0.5">
             {FILTROS.map((f, i) => {
               const activo = filtro === f.id;
+              const iconClass = `h-3 w-3 flex-shrink-0 ${activo ? "opacity-70" : "opacity-40"}`;
               return (
                 <button
                   key={f.id}
@@ -90,9 +93,28 @@ export function BandejaFiltros({
                       : "text-[#0D0D0D]/65 hover:bg-[#0D0D0D]/[0.05]"
                   }`}
                 >
-                  {f.label}
+                  <span className="flex items-center gap-1.5 min-w-0 flex-1">
+                    {f.regla ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span
+                            onClick={(e) => e.stopPropagation()}
+                            className={`flex-shrink-0 hover:opacity-100 ${activo ? "opacity-70" : "opacity-40"}`}
+                          >
+                            <Info className="h-3 w-3" />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="max-w-[180px] bg-[#012340] text-white">
+                          {f.regla}
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <Info className={iconClass} />
+                    )}
+                    <span className="truncate">{f.label}</span>
+                  </span>
                   <span
-                    className={`text-[10px] font-bold tabular-nums ${activo ? "opacity-70" : "opacity-40"}`}
+                    className={`text-[10px] font-bold tabular-nums flex-shrink-0 ${activo ? "opacity-70" : "opacity-40"}`}
                   >
                     {conteoPorEstado.get(f.id) ?? 0}
                   </span>
@@ -100,6 +122,7 @@ export function BandejaFiltros({
               );
             })}
           </div>
+          </TooltipProvider>
         </div>
 
         {/* Footer */}

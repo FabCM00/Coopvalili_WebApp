@@ -141,7 +141,7 @@ export function UploadDocumentModal({
                 className={cn(
                   "flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed px-6 py-9 text-center transition-colors",
                   dragOver
-                    ? "border-[#F29A2E] bg-[#F29A2E]/[0.06]"
+                    ? "border-brand-orange bg-brand-orange/[0.06]"
                     : "border-[#0D0D0D]/15 hover:border-[#012340]/40 hover:bg-[#012340]/[0.02]",
                 )}
               >
@@ -150,7 +150,7 @@ export function UploadDocumentModal({
                 </span>
                 <p className="mt-3 text-sm text-[#0D0D0D]/70">
                   Arrastra y suelta o{" "}
-                  <span className="font-semibold text-[#F29A2E] underline underline-offset-4">
+                  <span className="font-semibold text-brand-orange underline underline-offset-4">
                     elige un archivo
                   </span>
                 </p>

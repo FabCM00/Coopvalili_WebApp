@@ -5,19 +5,18 @@ import { useProtectedRoute } from "@/hooks/use-protected-route";
 import { useAsociados } from "@/hooks/use-asociados";
 import { Button } from "@/components/ui/button";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { KpiCard } from "@/components/ui/kpi-card";
+import { DataTablePagination } from "@/components/ui/data-table-pagination";
 
 import {
     Search,
     RefreshCw,
-    ChevronLeft,
-    ChevronRight,
     Database,
     Wallet,
     MapPin,
     Users,
 } from "lucide-react";
 
-import type { LucideIcon } from "lucide-react";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const PAGE_SIZE_OPTIONS = [5, 10, 25, 50, 100];
@@ -142,7 +141,7 @@ export default function DatosAsociadoPage() {
                 />
 
                 <KpiCard
-                    color="border-l-[#F29A2E]"
+                    color="border-l-brand-orange"
                     label="Filtrados"
                     value={filtered.length.toString()}
                     icon={Users}
@@ -247,7 +246,8 @@ export default function DatosAsociadoPage() {
                     </span>
                 </div>
 
-                <div className="overflow-x-auto">
+                {/* Desktop: tabla */}
+                <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-sm">
 
                         <thead>
@@ -268,7 +268,7 @@ export default function DatosAsociadoPage() {
                                 ].map((col) => (
                                     <th
                                         key={col}
-                                        className="py-4 px-4 text-center text-[11px] font-bold tracking-[0.18em] text-[#F29A2E] uppercase whitespace-nowrap"
+                                        className="py-4 px-4 text-center text-[11px] font-bold tracking-[0.18em] text-brand-orange uppercase whitespace-nowrap"
                                     >
                                         {col}
                                     </th>
@@ -380,8 +380,50 @@ export default function DatosAsociadoPage() {
                     </table>
                 </div>
 
+                {/* Mobile: tarjetas */}
+                <div className="md:hidden divide-y divide-[#0D0D0D]/5">
+                    {loading ? (
+                        Array.from({ length: pageSize }).map((_, i) => (
+                            <div key={i} className="p-4 space-y-2">
+                                <div className="h-3.5 w-32 bg-[#0D0D0D]/8 rounded animate-pulse" />
+                                <div className="h-3 w-24 bg-[#0D0D0D]/6 rounded animate-pulse" />
+                            </div>
+                        ))
+                    ) : error ? (
+                        <div className="py-10 text-center text-red-600 text-sm">{error}</div>
+                    ) : filtered.length === 0 ? (
+                        <div className="py-10 text-center text-sm text-[#0D0D0D]/40">
+                            No se encontraron registros.
+                        </div>
+                    ) : (
+                        filtered.map((row) => (
+                            <div key={row.id} className="p-4 space-y-3">
+                                <div className="flex items-center justify-between gap-2">
+                                    <p className="text-sm font-semibold text-brand-navy truncate">
+                                        {row.nombre || "—"} {row.primer_apellido || ""}
+                                    </p>
+                                    <span className="text-xs font-mono text-[#0D0D0D]/50 flex-shrink-0">
+                                        CC {row.cedula || "—"}
+                                    </span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                                    <Field label="Ciudad" value={row.ciudad || "—"} />
+                                    <Field label="Estado civil" value={row.estado_civil_norm || row.estado_civil || "—"} />
+                                    <Field label="Salario" value={formatMoney(row.salario)} />
+                                    <Field label="Aportes" value={formatMoney(row.aportes)} />
+                                    <Field label="Deuda" value={formatMoney(row.deuda_coopvalili)} />
+                                    <Field label="Edad" value={row.edad ? String(row.edad) : "—"} />
+                                    <Field label="Empresa" value={row.cliente_empresa || "—"} />
+                                    <Field label="Cupo" value={formatMoney(row.cuota_disponible)} />
+                                    <Field label="Antigüedad" value={row.antiguedad_laboral ? String(row.antiguedad_laboral) : "—"} />
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+
                 {!loading && total > 0 && (
-                    <Paginator
+                    <DataTablePagination
                         page={safePage}
                         totalPages={totalPages}
                         totalRows={total}
@@ -395,170 +437,13 @@ export default function DatosAsociadoPage() {
     );
 }
 
-/* ───────────────────────────────────────────── */
-
-function KpiCard({
-    color,
-    label,
-    value,
-    icon: Icon,
-}: {
-    color: string;
-    label: string;
-    value: string;
-    icon?: LucideIcon;
-}) {
+function Field({ label, value }: { label: string; value: string }) {
     return (
-        <div
-            className={`bg-white border border-[#0D0D0D]/10 border-l-4 ${color} p-4 flex items-center justify-between`}
-        >
-            <div>
-                <p className="text-[10px] font-bold tracking-[0.18em] uppercase text-[#0D0D0D]/50">
-                    {label}
-                </p>
-
-                <p className="mt-2 text-3xl font-bold text-[#012340]">
-                    {value}
-                </p>
-            </div>
-
-            {Icon && (
-                <div className="bg-[#012340]/5 text-[#012340] p-3 rounded-lg">
-                    <Icon className="h-6 w-6" />
-                </div>
-            )}
+        <div className="min-w-0">
+            <p className="text-[9px] font-bold tracking-wider uppercase text-[#0D0D0D]/40">
+                {label}
+            </p>
+            <p className="text-[#0D0D0D]/80 truncate">{value}</p>
         </div>
     );
-}
-
-function Paginator({
-    page,
-    totalPages,
-    totalRows,
-    pageStart,
-    pageSize,
-    onChange,
-}: {
-    page: number;
-    totalPages: number;
-    totalRows: number;
-    pageStart: number;
-    pageSize: number;
-    onChange: (p: number) => void;
-}) {
-
-    const from = pageStart + 1;
-
-    const to = Math.min(
-        pageStart + pageSize,
-        totalRows,
-    );
-
-    return (
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-t border-[#0D0D0D]/10 text-xs text-[#0D0D0D]/60">
-
-            <div>
-                Mostrando{" "}
-                <span className="font-semibold text-[#0D0D0D]">
-                    {from}
-                </span>
-                –
-                <span className="font-semibold text-[#0D0D0D]">
-                    {to}
-                </span>{" "}
-                de{" "}
-                <span className="font-semibold text-[#0D0D0D]">
-                    {totalRows}
-                </span>
-            </div>
-
-            <div className="flex items-center gap-1">
-
-                <button
-                    onClick={() => onChange(page - 1)}
-                    disabled={page <= 1}
-                    className="inline-flex items-center justify-center h-8 w-8 border border-[#0D0D0D]/15 text-[#0D0D0D]/70 hover:border-[#012340] hover:text-[#012340] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                    <ChevronLeft className="h-4 w-4" />
-                </button>
-
-                {getPageItems(
-                    page,
-                    totalPages,
-                ).map((item, i) =>
-                    item === "..." ? (
-                        <span
-                            key={`ellipsis-${i}`}
-                            className="inline-flex items-center justify-center h-8 w-8 text-[#0D0D0D]/40"
-                        >
-                            …
-                        </span>
-                    ) : (
-                        <button
-                            key={item}
-                            onClick={() =>
-                                onChange(item)
-                            }
-                            className={`inline-flex items-center justify-center h-8 min-w-[32px] px-2 text-xs font-medium border transition-colors ${item === page
-                                ? "bg-[#012340] text-white border-[#012340]"
-                                : "bg-white text-[#0D0D0D]/70 border-[#0D0D0D]/15 hover:border-[#012340] hover:text-[#012340]"
-                                }`}
-                        >
-                            {item}
-                        </button>
-                    ),
-                )}
-
-                <button
-                    onClick={() => onChange(page + 1)}
-                    disabled={page >= totalPages}
-                    className="inline-flex items-center justify-center h-8 w-8 border border-[#0D0D0D]/15 text-[#0D0D0D]/70 hover:border-[#012340] hover:text-[#012340] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                    <ChevronRight className="h-4 w-4" />
-                </button>
-
-            </div>
-        </div>
-    );
-}
-
-function getPageItems(
-    current: number,
-    total: number,
-): (number | "...")[] {
-
-    if (total <= 7) {
-        return Array.from(
-            { length: total },
-            (_, i) => i + 1,
-        );
-    }
-
-    const items: (number | "...")[] = [1];
-
-    const start = Math.max(
-        2,
-        current - 1,
-    );
-
-    const end = Math.min(
-        total - 1,
-        current + 1,
-    );
-
-    if (start > 2) {
-        items.push("...");
-    }
-
-    for (let i = start; i <= end; i++) {
-        items.push(i);
-    }
-
-    if (end < total - 1) {
-        items.push("...");
-    }
-
-    items.push(total);
-
-    return items;
 }

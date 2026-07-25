@@ -5,12 +5,14 @@ import type {
   SolicitudEstado,
   SolicitudResumen,
   SolicitudUI,
+  SolicitudesPage,
 } from "@/lib/types";
 
 export type {
   SolicitudEstado,
   SolicitudResumen,
   SolicitudUI,
+  SolicitudesPage,
   ValidacionItem,
   Valida1ResultRow,
   MotorProcessResultRow,
@@ -44,11 +46,22 @@ async function request<T>(url: string, init?: RequestInit): Promise<Result<T>> {
 
 export const bandeja = {
   listSolicitudes(
-    opts: { limit?: number; cedulaFilter?: string } = {},
-  ): Promise<Result<SolicitudResumen[]>> {
-    const qs = new URLSearchParams({ limit: String(opts.limit ?? 200) });
+    opts: {
+      limit?: number;
+      page?: number;
+      cedulaFilter?: string;
+      q?: string;
+      gestionado?: boolean;
+    } = {},
+  ): Promise<Result<SolicitudesPage>> {
+    const qs = new URLSearchParams({
+      limit: String(opts.limit ?? 20),
+      page: String(opts.page ?? 1),
+    });
     if (opts.cedulaFilter) qs.set("cedulaFilter", opts.cedulaFilter);
-    return request<SolicitudResumen[]>(`${PREFIX}/api/usuario/bandeja?${qs}`);
+    if (opts.q) qs.set("q", opts.q);
+    if (opts.gestionado !== undefined) qs.set("gestionado", String(opts.gestionado));
+    return request<SolicitudesPage>(`${PREFIX}/api/usuario/bandeja?${qs}`);
   },
 
   getSolicitud(radicado: string): Promise<Result<SolicitudUI>> {
@@ -80,34 +93,34 @@ export const ESTADO_LABEL: Record<SolicitudEstado, string> = {
 };
 
 export const ESTADO_DOT: Record<SolicitudEstado, string> = {
-  valida_1: "bg-cyan-500",
-  no_valida_1: "bg-red-500",
-  val_identidad: "bg-sky-500",
-  no_val_identidad: "bg-red-500",
-  fallo_servicios: "bg-purple-500",
+  valida_1: "bg-teal-500",
+  no_valida_1: "bg-pink-500",
+  val_identidad: "bg-indigo-500",
+  no_val_identidad: "bg-yellow-600",
+  fallo_servicios: "bg-red-600",
   no_viable: "bg-orange-500",
-  aprobado: "bg-green-500",
+  aprobado: "bg-emerald-500",
   revision: "bg-amber-500",
 };
 
 export const ESTADO_BADGE: Record<SolicitudEstado, string> = {
-  valida_1: "bg-cyan-50 text-cyan-700 border-cyan-200",
-  no_valida_1: "bg-red-50 text-red-700 border-red-200",
-  val_identidad: "bg-sky-50 text-sky-700 border-sky-200",
-  no_val_identidad: "bg-red-50 text-red-700 border-red-200",
-  fallo_servicios: "bg-purple-50 text-purple-700 border-purple-200",
+  valida_1: "bg-teal-50 text-teal-700 border-teal-200",
+  no_valida_1: "bg-pink-50 text-pink-700 border-pink-200",
+  val_identidad: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  no_val_identidad: "bg-yellow-50 text-yellow-800 border-yellow-300",
+  fallo_servicios: "bg-red-50 text-red-700 border-red-200",
   no_viable: "bg-orange-50 text-orange-700 border-orange-200",
-  aprobado: "bg-green-50 text-green-700 border-green-200",
+  aprobado: "bg-emerald-50 text-emerald-700 border-emerald-200",
   revision: "bg-amber-50 text-amber-700 border-amber-200",
 };
 
 export const ESTADO_BORDER: Record<SolicitudEstado, string> = {
-  valida_1: "border-l-cyan-500",
-  no_valida_1: "border-l-red-500",
-  val_identidad: "border-l-sky-500",
-  no_val_identidad: "border-l-red-500",
-  fallo_servicios: "border-l-purple-500",
+  valida_1: "border-l-teal-500",
+  no_valida_1: "border-l-pink-500",
+  val_identidad: "border-l-indigo-500",
+  no_val_identidad: "border-l-yellow-600",
+  fallo_servicios: "border-l-red-600",
   no_viable: "border-l-orange-500",
-  aprobado: "border-l-green-500",
+  aprobado: "border-l-emerald-500",
   revision: "border-l-amber-400",
 };

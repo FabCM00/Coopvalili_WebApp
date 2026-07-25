@@ -29,7 +29,7 @@ export function LoadingScreen({
       {/* Barra de progreso industrial */}
       <div className="flex flex-col items-center gap-4 w-48">
         <div className="relative h-[3px] w-full bg-[#0D0D0D]/8 overflow-hidden">
-          <div className="absolute inset-y-0 left-0 w-1/2 bg-[#F29A2E] animate-[loading-bar_1.4s_ease-in-out_infinite]" />
+          <div className="absolute inset-y-0 left-0 w-1/2 bg-brand-orange animate-[loading-bar_1.4s_ease-in-out_infinite]" />
         </div>
         <p className="text-[11px] font-bold tracking-[0.2em] uppercase text-[#0D0D0D]/40">
           {message}

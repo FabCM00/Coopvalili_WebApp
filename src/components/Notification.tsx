@@ -39,8 +39,8 @@ const TYPE_STYLES: Record<
     icon: <XCircle className="h-4 w-4" aria-hidden />,
   },
   warning: {
-    accent: "border-l-[#F29A2E]",
-    iconColor: "text-[#F29A2E]",
+    accent: "border-l-brand-orange",
+    iconColor: "text-brand-orange",
     kicker: "Atención",
     icon: <AlertTriangle className="h-4 w-4" aria-hidden />,
   },

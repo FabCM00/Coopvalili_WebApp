@@ -21,6 +21,9 @@ import {
 } from "lucide-react";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { useNotification } from "@/contexts/NotificationContext";
+import { KpiCard } from "@/components/ui/kpi-card";
+import { DataTablePagination } from "@/components/ui/data-table-pagination";
+import { Input } from "@/components/ui/input";
 
 const PAGE_SIZE = 10;
 
@@ -263,7 +266,8 @@ export default function AdminUsuariosPage() {
           </span>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Desktop: tabla */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#0D0D0D]/15">
@@ -277,7 +281,7 @@ export default function AdminUsuariosPage() {
                 ].map((col) => (
                   <th
                     key={col}
-                    className="py-4 px-4 text-center text-[11px] font-bold tracking-[0.18em] text-[#F29A2E] uppercase whitespace-nowrap"
+                    className="py-4 px-4 text-center text-[11px] font-bold tracking-[0.18em] text-brand-orange uppercase whitespace-nowrap"
                   >
                     {col}
                   </th>
@@ -397,8 +401,92 @@ export default function AdminUsuariosPage() {
           </table>
         </div>
 
+        {/* Mobile: tarjetas */}
+        <div className="md:hidden divide-y divide-[#0D0D0D]/5">
+          {loadingUsers ? (
+            Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="p-4 space-y-2">
+                <div className="h-3.5 w-32 bg-[#0D0D0D]/8 rounded animate-pulse" />
+                <div className="h-3 w-24 bg-[#0D0D0D]/6 rounded animate-pulse" />
+              </div>
+            ))
+          ) : filtered.length === 0 ? (
+            <div className="py-10 text-center text-sm text-[#0D0D0D]/40">
+              No se encontraron usuarios.
+            </div>
+          ) : (
+            pageRows.map((user) => {
+              const isToggling =
+                toggleMutation.isPending &&
+                toggleMutation.variables?.id === user.id;
+              const label = user.estado
+                ? "Activo"
+                : user.passwordSet === false
+                  ? "Pendiente"
+                  : "Inactivo";
+              const dot = user.estado
+                ? "bg-green-500"
+                : user.passwordSet === false
+                  ? "bg-amber-400"
+                  : "bg-red-500";
+              const text = user.estado
+                ? "text-[#0D0D0D]"
+                : user.passwordSet === false
+                  ? "text-amber-600"
+                  : "text-red-600";
+              return (
+                <div key={user.id} className="p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-brand-navy truncate">
+                      {user.username || "—"}
+                    </p>
+                    <span className="inline-flex items-center gap-1.5 text-xs flex-shrink-0">
+                      <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+                      <span className={text}>{label}</span>
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                    <Field label="Correo" value={user.email || "—"} />
+                    <Field label="Rol" value={user.role === "admin" ? "Administrador" : "Usuario"} />
+                    <Field
+                      label="Fecha creado"
+                      value={user.created_at ? new Date(user.created_at).toLocaleDateString("es-CO") : "—"}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      onClick={() => handleToggleActivo(user)}
+                      disabled={isToggling}
+                      className={`flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-[11px] font-bold tracking-widest uppercase border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${user.estado
+                        ? "border-red-200 text-red-600 hover:bg-red-50"
+                        : "border-green-200 text-green-700 hover:bg-green-50"
+                        }`}
+                    >
+                      {isToggling ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : user.estado ? (
+                        <ToggleLeft className="h-3.5 w-3.5" />
+                      ) : (
+                        <ToggleRight className="h-3.5 w-3.5" />
+                      )}
+                      {user.estado ? "Desactivar" : "Activar"}
+                    </button>
+                    <button
+                      onClick={() => handleDelete(user)}
+                      title="Eliminar usuario"
+                      className="inline-flex items-center justify-center h-[30px] w-[30px] border border-[#0D0D0D]/15 text-[#0D0D0D]/40 hover:border-red-300 hover:text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
         {!loadingUsers && filtered.length > 0 && (
-          <Paginator
+          <DataTablePagination
             page={safePage}
             totalPages={totalPages}
             totalRows={filtered.length}
@@ -476,37 +564,13 @@ export default function AdminUsuariosPage() {
   );
 }
 
-
-import type { LucideIcon } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Paginator } from "@/components/ui/paginator";
-
-function KpiCard({
-  color,
-  label,
-  value,
-  icon: Icon,
-}: {
-  color: string;
-  label: string;
-  value: string;
-  icon?: LucideIcon;
-}) {
+function Field({ label, value }: { label: string; value: string }) {
   return (
-    <div
-      className={`bg-white border border-[#0D0D0D]/10 border-l-4 ${color} p-4 flex items-center justify-between`}
-    >
-      <div>
-        <p className="text-[10px] font-bold tracking-[0.18em] uppercase text-[#0D0D0D]/50">
-          {label}
-        </p>
-        <p className="mt-2 text-3xl font-bold text-[#012340]">{value}</p>
-      </div>
-      {Icon && (
-        <div className="bg-[#012340]/5 text-[#012340] p-3 rounded-lg">
-          <Icon className="h-6 w-6" />
-        </div>
-      )}
+    <div className="min-w-0">
+      <p className="text-[9px] font-bold tracking-wider uppercase text-[#0D0D0D]/40">
+        {label}
+      </p>
+      <p className="text-[#0D0D0D]/80 truncate">{value}</p>
     </div>
   );
 }

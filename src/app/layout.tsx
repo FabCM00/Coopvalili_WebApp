@@ -18,8 +18,8 @@ export const metadata: Metadata = {
   title: "Coopvalili",
   description: "Coopvalili",
   icons: {
-    icon: "https://i.imgur.com/kBwQizJ.jpeg",
-    apple: "https://i.imgur.com/kBwQizJ.jpeg",
+    icon: "/Imagen1.png",
+    apple: "/Imagen1.png",
   },
 };
 

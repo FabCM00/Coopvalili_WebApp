@@ -53,7 +53,7 @@ export default function NotFound() {
         <div className="flex flex-col gap-3 sm:flex-row">
           <Link
             href={homeHref}
-            className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#F29A2E] px-6 font-semibold text-white transition-all hover:bg-[#e48716]"
+            className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-brand-orange px-6 font-semibold text-white transition-all hover:bg-brand-orange-hover"
           >
             Ir al inicio
             <ArrowRight size={18} />

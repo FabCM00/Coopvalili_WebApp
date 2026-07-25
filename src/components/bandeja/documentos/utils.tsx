@@ -51,8 +51,8 @@ export const STATUS_CONFIG: Record<
   },
   revision: {
     label: "En revisión",
-    badge: "bg-[#F29A2E]/10 text-[#b46f12] border-[#F29A2E]/30",
-    dot: "bg-[#F29A2E]",
+    badge: "bg-brand-orange/10 text-[#b46f12] border-brand-orange/30",
+    dot: "bg-brand-orange",
     icon: Clock3,
   },
   pendiente: {

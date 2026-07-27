@@ -8,13 +8,10 @@ const globalForPrisma = globalThis as unknown as {
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
-    // Sin "error": el motor emite `prisma:error` por cada intento fallido aunque
-    // withPrismaRetry lo recupere. Los errores no recuperados igual salen en el
-    // catch del handler (respuesta 500) y en el console.warn del retry.
     log:
       process.env.NODE_ENV === "development"
-        ? ["query", "warn"]
-        : ["warn"],
+        ? ["query", "error", "warn"]
+        : ["error"],
   });
 
 if (process.env.NODE_ENV !== "production") {

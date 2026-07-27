@@ -17,10 +17,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Coopvalili",
   description: "Coopvalili",
-  icons: {
-    icon: "/Imagen1.png",
-    apple: "/Imagen1.png",
-  },
+   icons: {
+        icon: "https://i.imgur.com/kBwQizJ.jpeg",
+        apple: "https://i.imgur.com/kBwQizJ.jpeg",
+    },
 };
 
 export default async function RootLayout({

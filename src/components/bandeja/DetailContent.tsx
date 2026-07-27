@@ -10,6 +10,7 @@ import {
   MinusCircle,
   Check,
   X,
+  Copy,
   Database,
   Cpu,
   ShieldCheck,
@@ -668,6 +669,7 @@ export function MotorJsonView({
 }) {
   const [activePanel, setActivePanel] =
     useState<MotorJsonPanel>("motor_process");
+  const [copiado, setCopiado] = useState(false);
   const [panelSide, setPanelSide] = useState<Record<MotorJsonPanel, ReqRes>>({
     valida1: "res",
     motor_data: "res",
@@ -709,10 +711,31 @@ export function MotorJsonView({
 
   const activeData = getPanelData(activePanel);
 
+  const copiarTexto = useMemo(() => {
+    if (activeData == null) return "";
+    try {
+      return JSON.stringify(deepParse(activeData), null, 2);
+    } catch {
+      return "";
+    }
+  }, [activeData]);
+
+  const handleCopiar = useCallback(async () => {
+    if (!copiarTexto) return;
+    try {
+      await navigator.clipboard.writeText(copiarTexto);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 1800);
+    } catch {
+      /* clipboard no disponible (requiere HTTPS o localhost) */
+    }
+  }, [copiarTexto]);
+
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 border-b border-slate-200 bg-white overflow-x-auto">
-        <div className="flex min-w-max">
+      <div className="flex-shrink-0 flex items-stretch border-b border-slate-200 bg-white">
+        <div className="min-w-0 flex-1 overflow-x-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
+          <div className="flex min-w-max h-full">
           {MOTOR_JSON_PANELS.map((panel) => {
             const isActive = activePanel === panel.id;
             const hasData = getResData(panel.id) != null;
@@ -794,7 +817,31 @@ export function MotorJsonView({
               </Popover>
             );
           })}
+          </div>
         </div>
+
+        {/* Copiar el JSON del panel/lado activo */}
+        <button
+          onClick={handleCopiar}
+          disabled={!copiarTexto}
+          title={
+            copiarTexto ? "Copiar JSON" : "No hay JSON para copiar"
+          }
+          className={`flex-shrink-0 flex items-center gap-1.5 px-4 text-[10px] font-bold uppercase tracking-wider border-l border-slate-200 transition-colors ${
+            copiado
+              ? "bg-emerald-50 text-emerald-700"
+              : copiarTexto
+                ? "bg-slate-50/60 text-[#0D0D0D]/40 hover:bg-white hover:text-[#012340]"
+                : "bg-slate-50/60 text-[#0D0D0D]/20 cursor-not-allowed"
+          }`}
+        >
+          {copiado ? (
+            <Check className="h-3.5 w-3.5 flex-shrink-0" />
+          ) : (
+            <Copy className="h-3.5 w-3.5 flex-shrink-0" />
+          )}
+          <span>{copiado ? "Copiado" : "Copiar"}</span>
+        </button>
       </div>
 
       <div className="flex-1 min-h-0 overflow-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none] bg-white">

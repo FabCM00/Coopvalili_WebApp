@@ -20,10 +20,14 @@ export function ModalHeader({
   onClose,
   onGestionar,
 }: ModalHeaderProps) {
+  const showGestionar = !solicitud.gestionado && onGestionar;
+  // Sin acciones no hay nada que pintar: evita una fila vacía con margen.
+  if (!showGestionar && !onClose) return null;
+
   return (
     <div className="flex items-center justify-between gap-4 mb-4">
       {/* Botón gestionar — solo si no está gestionada */}
-      {!solicitud.gestionado && onGestionar && (
+      {showGestionar && (
         <button
           onClick={onGestionar}
           className="h-9 px-4 bg-[#012340] hover:bg-[#012340]/85 text-white text-[11px] font-semibold tracking-wide rounded-sm transition-colors whitespace-nowrap"
@@ -32,15 +36,8 @@ export function ModalHeader({
         </button>
       )}
 
-      {/* Badge gestionada */}
-      {solicitud.gestionado && (
-        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-sm">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
-          <span className="text-[11px] font-semibold text-emerald-700">
-            Gestionada
-          </span>
-        </div>
-      )}
+      {/* El estado "Gestionada" se muestra junto al badge de estado
+          en SolicitanteHeader, no aquí. */}
 
       {onClose && (
         <button
@@ -87,9 +84,19 @@ export function SolicitanteHeader({ solicitud }: { solicitud: SolicitudUI }) {
         <p className="text-[10px] font-bold tracking-[0.18em] uppercase text-[#0D0D0D]/35 mb-2">
           Estado de la solicitud
         </p>
-        <span className={`text-[10px] font-bold px-2 py-0.5 border ${badge}`}>
-          {badgeLabel}
-        </span>
+        <div className="flex items-center justify-end gap-1.5">
+          <span className={`text-[10px] font-bold px-2 py-0.5 border ${badge}`}>
+            {badgeLabel}
+          </span>
+          {solicitud.gestionado && (
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 border border-emerald-200">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+              <span className="text-[10px] font-bold text-emerald-700">
+                Gestionada
+              </span>
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

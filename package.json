@@ -11,7 +11,8 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
-    "seed:admins": "tsx scripts/seed-admins.ts"
+    "seed:admins": "tsx scripts/seed-admins.ts",
+    "seed:test-users": "tsx scripts/seed-test-users.ts"
   },
   "dependencies": {
     "@azure/communication-email": "^1.1.0",

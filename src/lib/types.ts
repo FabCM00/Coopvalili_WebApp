@@ -152,3 +152,12 @@ export interface SolicitudUI extends SolicitudResumen {
     credito_decision: CreditoDecisionRow | null;
   };
 }
+
+// Página de resultados de la bandeja (paginación server-side).
+export interface SolicitudesPage {
+  data: SolicitudResumen[];
+  total: number;
+  totalPages: number;
+  totalActivas: number;
+  totalGestionadas: number;
+}

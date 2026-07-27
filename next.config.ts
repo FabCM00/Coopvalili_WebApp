@@ -1,9 +1,22 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
-  images: {
-    remotePatterns: [],
+/**
+ * @type {import('next').NextConfig}
+ */
+const nextConfig = {
+  reactStrictMode: false,
+  swcMinify: true,
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  output: 'standalone',
+  async redirects() {
+    return [
+      {
+        source: '/',
+        destination: '/login',
+        permanent: true,
+      },
+    ];
   },
 };
 
-export default nextConfig;
+module.exports = nextConfig;

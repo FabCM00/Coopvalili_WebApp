@@ -43,7 +43,7 @@ type SetPasswordValues = z.infer<typeof setPasswordSchema>;
 const inputBase =
   "w-full h-12 rounded-[10px] border-[1.2px] bg-white pl-11 pr-11 text-base shadow-sm outline-none transition";
 const inputNormal =
-  "border-[#0D0D0D]/15 focus:border-[#F29A2E] focus:ring-2 focus:ring-[#F29A2E]/30";
+  "border-[#0D0D0D]/15 focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/30";
 const inputError =
   "border-red-500 bg-red-50 focus:border-red-600 focus:ring-2 focus:ring-red-200";
 
@@ -115,7 +115,7 @@ function SetPasswordForm() {
       >
         <Button
           onClick={() => router.replace("/login")}
-          className="h-11 w-full rounded-[10px] bg-[#F29A2E] text-sm font-semibold text-[#0D0D0D] shadow-sm transition hover:bg-[#e08c28]"
+          className="h-11 w-full rounded-[10px] bg-brand-orange text-sm font-semibold text-[#0D0D0D] shadow-sm transition hover:bg-brand-orange-hover"
         >
           <LogIn className="mr-2 h-4 w-4" /> Ir al inicio de sesión
         </Button>
@@ -138,7 +138,7 @@ function SetPasswordForm() {
         {!isInvite && (
           <Button
             onClick={() => router.replace("/forgot-password")}
-            className="h-11 w-full rounded-[10px] bg-[#F29A2E] text-sm font-semibold text-[#0D0D0D] shadow-sm transition hover:bg-[#e08c28]"
+            className="h-11 w-full rounded-[10px] bg-brand-orange text-sm font-semibold text-[#0D0D0D] shadow-sm transition hover:bg-brand-orange-hover"
           >
             Solicitar nuevo enlace
           </Button>
@@ -168,7 +168,7 @@ function SetPasswordForm() {
       >
         <Button
           onClick={() => router.replace("/login")}
-          className="h-11 w-full rounded-[10px] bg-[#F29A2E] text-sm font-semibold text-[#0D0D0D] shadow-sm transition hover:bg-[#e08c28]"
+          className="h-11 w-full rounded-[10px] bg-brand-orange text-sm font-semibold text-[#0D0D0D] shadow-sm transition hover:bg-brand-orange-hover"
         >
           <LogIn className="mr-2 h-4 w-4" /> Continuar
         </Button>
@@ -302,7 +302,7 @@ function SetPasswordForm() {
         <Button
           type="submit"
           disabled={loading}
-          className="h-12 w-full rounded-[10px] bg-[#F29A2E] text-base font-semibold text-[#0D0D0D] shadow-sm transition hover:bg-[#e08c28] disabled:opacity-50"
+          className="h-12 w-full rounded-[10px] bg-brand-orange text-base font-semibold text-[#0D0D0D] shadow-sm transition hover:bg-brand-orange-hover disabled:opacity-50"
         >
           {loading ? (
             <>

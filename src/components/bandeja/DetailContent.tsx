@@ -13,16 +13,18 @@ import {
   Database,
   Cpu,
   ShieldCheck,
-  FileJson,
   ChevronRight,
   ChevronDown,
   Search,
+  ScanFace,
+  Info,
 } from "lucide-react";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { SolicitanteHeader } from "./ModalHeader";
 
 function fmt(v: string | number | null | undefined): string {
   if (v === null || v === undefined || v === "") return "—";
@@ -73,7 +75,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function InfoRow({
+function GridField({
   label,
   value,
   mono,
@@ -89,13 +91,44 @@ function InfoRow({
   if (value === null || value === undefined || value === "") return null;
   const display = currency ? fmt(value) : String(value);
   return (
-    <div className="flex items-center justify-between gap-6 px-4 py-2.5">
-      <span className="text-xs text-[#0D0D0D]/45 flex-shrink-0">{label}</span>
-      <span
-        className={`text-xs text-right break-all leading-relaxed ${highlight ? "font-bold text-[#012340]" : mono ? "font-mono text-[#0D0D0D]/65" : "font-medium text-[#0D0D0D]/80"}`}
+    <div className="min-w-0 bg-white px-4 py-3">
+      <p className="text-[9px] font-bold tracking-wider uppercase text-[#0D0D0D]/40">
+        {label}
+      </p>
+      <p
+        className={`truncate text-sm ${highlight ? "font-bold text-[#012340]" : mono ? "font-mono text-[#0D0D0D]/70" : "font-medium text-[#0D0D0D]/85"}`}
       >
         {display}
-      </span>
+      </p>
+    </div>
+  );
+}
+
+function GridSection({
+  title,
+  tooltip,
+  children,
+}: {
+  title: string;
+  tooltip?: string;
+  children: ReactNode;
+}) {
+  const fields = React.Children.toArray(children).filter(Boolean);
+  const isOdd = fields.length % 2 === 1;
+  return (
+    <div className="border border-[#0D0D0D]/8 bg-white pt-4">
+      <p className="flex items-center gap-1.5 text-[10px] font-bold tracking-[0.18em] uppercase text-[#0D0D0D]/35 mb-3 px-4">
+        {title}
+        {tooltip && (
+          <span title={tooltip} className="inline-flex flex-shrink-0">
+            <Info className="h-3 w-3 text-[#0D0D0D]/30" />
+          </span>
+        )}
+      </p>
+      <div className="grid grid-cols-2 gap-px bg-[#0D0D0D]/8">
+        {fields}
+        {isOdd && <div className="" />}
+      </div>
     </div>
   );
 }
@@ -204,6 +237,7 @@ export function ResumenSolicitud({ solicitud }: { solicitud: SolicitudUI }) {
   const md = solicitud.raw.motor_data;
   const iv = solicitud.raw.identity_validation;
   const cd = solicitud.raw.credito_decision;
+  const mpProcessing = (mp?.response_json as any)?.processing ?? null;
   const opcionElegidaId =
     cd?.opcion_elegida === "B1"
       ? 1
@@ -215,83 +249,109 @@ export function ResumenSolicitud({ solicitud }: { solicitud: SolicitudUI }) {
 
   return (
     <div className="p-4 flex flex-col gap-5">
-      {solicitud.sinMotor && (
-        <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 px-3 py-3 text-xs text-amber-800">
-          <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5 text-amber-500" />
-          <span>
-            Sin registro en{" "}
-            <span className="font-mono font-semibold">
-              motor_process_results
-            </span>
-            . Solo se muestran datos de la validación inicial.
-          </span>
-        </div>
-      )}
-      <Section title="Solicitante">
-        <InfoRow label="Nombre" value={solicitud.solicitante} highlight />
-        <InfoRow label="Cédula" value={solicitud.cedula} mono />
-        {md?.edad != null && <InfoRow label="Edad" value={`${md.edad} años`} />}
+      <SolicitanteHeader solicitud={solicitud} />
+      <GridSection
+        title="Solicitante"
+        tooltip="Para más información revisa la pestaña de Datos JSON."
+      >
+        {md?.edad != null && (
+          <GridField label="Edad" value={`${md.edad} años`} />
+        )}
         {md?.antiguedad_laboral != null && (
-          <InfoRow
+          <GridField
             label="Antigüedad Laboral"
             value={`${md.antiguedad_laboral} meses`}
           />
         )}
-        <InfoRow label="Celular" value={v1.celular ?? v1.telefono} mono />
-        <InfoRow label="Email" value={v1.email} mono />
-        <InfoRow label="Fecha" value={solicitud.fecha} />
-      </Section>
+        <GridField label="Celular" value={v1.celular ?? v1.telefono} mono />
+        <GridField label="Email" value={v1.email} mono />
+      </GridSection>
 
-      <Section title="Solicitud">
-        <InfoRow
+      <GridSection
+        title="Solicitud"
+        tooltip="Para más información revisa la pestaña de Datos JSON."
+      >
+        <GridField
           label="Monto solicitado"
           value={md?.monto_solicitado}
           currency
           highlight
         />
-        <InfoRow
+        <GridField
           label="Monto definitivo"
           value={mp?.monto_definitivo}
           currency
           highlight
         />
-        <InfoRow label="Línea de crédito" value={md?.linea_credito} />
+        <GridField label="Línea de crédito" value={md?.linea_credito} />
+        {mpProcessing?.perfil != null && (
+          <GridField label="Perfil" value={mpProcessing.perfil} />
+        )}
         {md && (
           <>
-            <InfoRow label="Salario" value={md.salario} currency />
-            <InfoRow
+            <GridField label="Salario" value={md.salario} currency />
+            <GridField
               label="Egresos volante"
               value={md.egresos_volante}
               currency
             />
-            <InfoRow
-              label="Deuda cooperativa"
-              value={md.deuda_coopvalili}
-              currency
-            />
           </>
         )}
-      </Section>
+        {md?.deuda_coopvalili != null && (
+          <GridField
+            label="Deuda cooperativa"
+            value={md.deuda_coopvalili}
+            currency
+          />
+        )}
+        {mpProcessing?.conceptoDefinitivo != null && (
+          <GridField
+            label="Concepto definitivo"
+            value={mpProcessing.conceptoDefinitivo}
+          />
+        )}
+        {mpProcessing?.cuotaDefinitiva != null && (
+          <GridField
+            label="Cuota definitiva"
+            value={mpProcessing.cuotaDefinitiva}
+          />
+        )}
+        {mpProcessing?.frecuenciaMes != null && (
+          <GridField
+            label="Frecuencia de pago"
+            value={`${mpProcessing.frecuenciaMes} veces/mes`}
+          />
+        )}
+        {mpProcessing?.usuarioCredito != null && (
+          <GridField
+            label="Usuario de crédito"
+            value={mpProcessing.usuarioCredito}
+          />
+        )}
+      </GridSection>
 
       {mp && (
-        <Section title="Análisis del motor">
-          <InfoRow label="Ingresos" value={mp.ingresos} currency />
-          <InfoRow label="Egresos" value={mp.egresos} currency />
-          <InfoRow label="Mínimo vital" value={mp.minimo_vital} currency />
-          <InfoRow label="Solvencia" value={mp.solvencia} currency />
-          <InfoRow label="Desprotegido" value={mp.desprotegido} currency />
-          <InfoRow label="Disponible" value={mp.disponible} currency />
-          <InfoRow
+        <GridSection
+          title="Análisis del motor"
+          tooltip="Para más información revisa la pestaña de Datos JSON."
+        >
+          <GridField label="Ingresos" value={mp.ingresos} currency />
+          <GridField label="Egresos" value={mp.egresos} currency />
+          <GridField label="Mínimo vital" value={mp.minimo_vital} currency />
+          <GridField label="Solvencia" value={mp.solvencia} currency />
+          <GridField label="Desprotegido" value={mp.desprotegido} currency />
+          <GridField label="Disponible" value={mp.disponible} currency />
+          <GridField
             label="Endeudamiento actual"
             value={mp.endeudamiento_actual}
             currency
           />
-          <InfoRow
+          <GridField
             label="Endeudamiento proyectado"
             value={mp.endeudamiento_proyectado}
             currency
           />
-        </Section>
+        </GridSection>
       )}
 
       {mp &&
@@ -502,8 +562,6 @@ export function ResumenSolicitud({ solicitud }: { solicitud: SolicitudUI }) {
 
 interface JsonViewProps {
   data: any;
-  label?: string;
-  hideExpand?: boolean;
 }
 
 export function JsonView({ data }: JsonViewProps) {
@@ -539,14 +597,18 @@ export function JsonView({ data }: JsonViewProps) {
             readOnly: true,
             minimap: { enabled: false },
             scrollBeyondLastLine: false,
-            fontSize: 10,
-            fontFamily: "Consolas, 'Courier New', monospace",
+            fontSize: 13,
+            lineHeight: 22,
+            fontFamily: "'JetBrains Mono', Consolas, 'Courier New', monospace",
             wordWrap: "on",
-            renderLineHighlight: "none",
-            lineNumbersMinChars: 5,
+            renderLineHighlight: "line",
+            lineNumbersMinChars: 4,
             folding: true,
-            padding: { top: 16, bottom: 16 },
+            padding: { top: 20, bottom: 20 },
             contextmenu: false,
+            bracketPairColorization: { enabled: true },
+            guides: { indentation: true, bracketPairs: true },
+            renderWhitespace: "none",
           }}
           loading={
             <div className="p-4 text-xs text-slate-400 font-mono">
@@ -575,25 +637,25 @@ const MOTOR_JSON_PANELS: {
   {
     id: "valida1",
     shortLabel: "Validación",
-    icon: <ShieldCheck className="h-3.5 w-3.5" />,
+    icon: <ShieldCheck className="h-4 w-4" />,
     hasReqRes: true,
   },
   {
     id: "motor_data",
     shortLabel: "Motor Data",
-    icon: <Database className="h-3.5 w-3.5" />,
+    icon: <Database className="h-4 w-4" />,
     hasReqRes: true,
   },
   {
     id: "motor_process",
     shortLabel: "Motor Process",
-    icon: <Cpu className="h-3.5 w-3.5" />,
+    icon: <Cpu className="h-4 w-4" />,
     hasReqRes: true,
   },
   {
     id: "identity",
     shortLabel: "Identity",
-    icon: <FileJson className="h-3.5 w-3.5" />,
+    icon: <ScanFace className="h-4 w-4" />,
     hasReqRes: true,
   },
 ];
@@ -601,10 +663,8 @@ const MOTOR_JSON_PANELS: {
 
 export function MotorJsonView({
   solicitud,
-  hideExpand,
 }: {
   solicitud: SolicitudUI;
-  hideExpand?: boolean;
 }) {
   const [activePanel, setActivePanel] =
     useState<MotorJsonPanel>("motor_process");
@@ -651,7 +711,7 @@ export function MotorJsonView({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 border-b border-slate-200 bg-slate-50 overflow-x-auto">
+      <div className="flex-shrink-0 border-b border-slate-200 bg-white overflow-x-auto">
         <div className="flex min-w-max">
           {MOTOR_JSON_PANELS.map((panel) => {
             const isActive = activePanel === panel.id;
@@ -667,7 +727,7 @@ export function MotorJsonView({
                                             ${
                                               isActive
                                                 ? "bg-white text-[#012340]"
-                                                : "text-slate-400 hover:text-slate-600 hover:bg-white/70"
+                                                : "bg-slate-50/60 text-slate-400 hover:text-slate-600 hover:bg-white"
                                             }`}
                   >
                     <span
@@ -750,10 +810,7 @@ export function MotorJsonView({
             </div>
           </div>
         ) : (
-          <JsonView
-            data={activeData}
-            hideExpand={hideExpand}
-          />
+          <JsonView data={activeData} />
         )}
       </div>
     </div>

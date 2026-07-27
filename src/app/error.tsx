@@ -60,7 +60,7 @@ export default function Error({
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full max-w-sm mt-6">
           <button
             onClick={reset}
-            className="flex h-12 w-full items-center justify-center rounded-[10px] bg-[#F29A2E] text-base font-semibold text-[#0D0D0D] shadow-sm transition hover:bg-[#F28A2E]"
+            className="flex h-12 w-full items-center justify-center rounded-[10px] bg-brand-orange text-base font-semibold text-[#0D0D0D] shadow-sm transition hover:bg-brand-orange-hover"
           >
             Intentar de nuevo
           </button>

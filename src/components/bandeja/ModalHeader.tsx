@@ -4,7 +4,6 @@ import {
   type SolicitudUI,
   ESTADO_LABEL,
   ESTADO_BADGE,
-  ESTADO_BORDER,
 } from "@/lib/bandeja";
 import { X } from "lucide-react";
 
@@ -21,31 +20,55 @@ export function ModalHeader({
   onClose,
   onGestionar,
 }: ModalHeaderProps) {
-  const border = ESTADO_BORDER[solicitud.estado];
+  return (
+    <div className="flex items-center justify-between gap-4 mb-4">
+      {/* Botón gestionar — solo si no está gestionada */}
+      {!solicitud.gestionado && onGestionar && (
+        <button
+          onClick={onGestionar}
+          className="h-9 px-4 bg-[#012340] hover:bg-[#012340]/85 text-white text-[11px] font-semibold tracking-wide rounded-sm transition-colors whitespace-nowrap"
+        >
+          Marcar gestionado
+        </button>
+      )}
+
+      {/* Badge gestionada */}
+      {solicitud.gestionado && (
+        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-sm">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+          <span className="text-[11px] font-semibold text-emerald-700">
+            Gestionada
+          </span>
+        </div>
+      )}
+
+      {onClose && (
+        <button
+          onClick={onClose}
+          title="Cerrar"
+          className="h-8 w-8 flex items-center justify-center text-[#0D0D0D]/30 hover:text-[#012340] transition-colors rounded-sm"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function SolicitanteHeader({ solicitud }: { solicitud: SolicitudUI }) {
   const badge = ESTADO_BADGE[solicitud.estado];
   const badgeLabel = ESTADO_LABEL[solicitud.estado];
 
   return (
-    <div
-      className={`border-b border-[#0D0D0D]/10 border-l-4 ${border} px-4 py-3 flex items-center justify-between gap-4 flex-shrink-0 bg-white`}
-    >
-      <div className="flex-1 min-w-0">
-        {/* Estado + decisión */}
-        <div className="flex items-center gap-2 mb-2">
-          <span
-            className={`text-[10px] font-bold px-2 py-0.5 border ${badge}`}
-          >
-            {badgeLabel}
-          </span>
-        
-        </div>
-
-        {/* Nombre */}
+    <div className="flex items-start justify-between gap-4 mb-1">
+      <div className="min-w-0">
+        <p className="text-[10px] font-bold tracking-[0.18em] uppercase text-[#0D0D0D]/35 mb-2">
+          Información del solicitante
+        </p>
         <p className="text-sm font-semibold text-[#012340] truncate">
           {solicitud.solicitante}
         </p>
 
-        {/* Meta info */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#0D0D0D]/45 mt-1">
           <span>
             <span className="opacity-60">CC</span> {solicitud.cedula}
@@ -60,37 +83,13 @@ export function ModalHeader({
         </div>
       </div>
 
-      {/* Score + acciones + close */}
-      <div className="flex items-center gap-2 flex-shrink-0">
-        {/* Botón gestionar — solo si no está gestionada */}
-        {!solicitud.gestionado && onGestionar && (
-          <button
-            onClick={onGestionar}
-            className="h-9 px-4 bg-[#012340] hover:bg-[#012340]/85 text-white text-[11px] font-semibold tracking-wide rounded-sm transition-colors whitespace-nowrap"
-          >
-            Marcar gestionado
-          </button>
-        )}
-
-        {/* Badge gestionada */}
-        {solicitud.gestionado && (
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-sm">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
-            <span className="text-[11px] font-semibold text-emerald-700">
-              Gestionada
-            </span>
-          </div>
-        )}
-
-        {onClose && (
-          <button
-            onClick={onClose}
-            title="Cerrar"
-            className="h-8 w-8 flex items-center justify-center text-[#0D0D0D]/30 hover:text-[#012340] transition-colors rounded-sm"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        )}
+      <div className="flex-shrink-0 text-right">
+        <p className="text-[10px] font-bold tracking-[0.18em] uppercase text-[#0D0D0D]/35 mb-2">
+          Estado de la solicitud
+        </p>
+        <span className={`text-[10px] font-bold px-2 py-0.5 border ${badge}`}>
+          {badgeLabel}
+        </span>
       </div>
     </div>
   );

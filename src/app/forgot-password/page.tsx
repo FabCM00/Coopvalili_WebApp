@@ -22,7 +22,7 @@ type ForgotFormValues = z.infer<typeof forgotSchema>;
 const inputBase =
   "w-full h-12 rounded-[10px] border-[1.2px] bg-white pl-11 pr-11 text-base shadow-sm outline-none transition";
 const inputNormal =
-  "border-[#0D0D0D]/15 focus:border-[#F29A2E] focus:ring-2 focus:ring-[#F29A2E]/30";
+  "border-[#0D0D0D]/15 focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/30";
 const inputError =
   "border-red-500 bg-red-50 focus:border-red-600 focus:ring-2 focus:ring-red-200";
 
@@ -88,8 +88,8 @@ export default function ForgotPasswordPage() {
   if (sent) {
     return (
       <AuthStateCard
-        icon={<Mail className="h-6 w-6 text-[#F29A2E]" />}
-        iconBg="bg-[#F29A2E]/10"
+        icon={<Mail className="h-6 w-6 text-brand-orange" />}
+        iconBg="bg-brand-orange/10"
         title="Revisa tu correo"
         description={
           <>
@@ -103,7 +103,7 @@ export default function ForgotPasswordPage() {
       >
         <a
           href="mailto:"
-          className="flex h-11 w-full items-center justify-center rounded-[10px] bg-[#F29A2E] text-sm font-semibold text-[#0D0D0D] shadow-sm transition hover:bg-[#e08c28]"
+          className="flex h-11 w-full items-center justify-center rounded-[10px] bg-brand-orange text-sm font-semibold text-[#0D0D0D] shadow-sm transition hover:bg-brand-orange-hover"
         >
           Abrir cliente de correo
         </a>
@@ -184,7 +184,7 @@ export default function ForgotPasswordPage() {
         <Button
           type="submit"
           disabled={loading}
-          className="h-12 w-full rounded-[10px] bg-[#F29A2E] text-base font-semibold text-[#0D0D0D] shadow-sm transition hover:bg-[#e08c28] disabled:opacity-50"
+          className="h-12 w-full rounded-[10px] bg-brand-orange text-base font-semibold text-[#0D0D0D] shadow-sm transition hover:bg-brand-orange-hover disabled:opacity-50"
         >
           {loading ? (
             <>

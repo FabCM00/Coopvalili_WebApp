@@ -64,6 +64,7 @@ export const authConfig = {
       const isApiRoute = nextUrl.pathname.startsWith("/api/");
       const isAdminRoute = nextUrl.pathname.startsWith("/admin");
       const isUserRoute = nextUrl.pathname.startsWith("/usuario");
+      const isLoginRoute = nextUrl.pathname === "/login";
       const isProtectedRoute = isAdminRoute || isUserRoute || isApiRoute;
 
       // Rutas API sin sesión → 401 JSON (no redirect al login)
@@ -71,6 +72,18 @@ export const authConfig = {
         return new Response(
           JSON.stringify({ ok: false, message: "No autorizado." }),
           { status: 401, headers: { "Content-Type": "application/json" } },
+        );
+      }
+
+      // Ya logueado visitando /login → redirect directo a su home,
+      // evita el parpadeo del formulario antes de que el cliente detecte
+      // la sesión y redirija.
+      if (isLoggedIn && isLoginRoute) {
+        return Response.redirect(
+          new URL(
+            nextUrl.basePath + (role === "admin" ? "/admin/usuarios" : "/usuario/bandeja"),
+            nextUrl,
+          ),
         );
       }
 
@@ -90,21 +103,23 @@ export const authConfig = {
       return true;
     },
 
-    // Codifica id y role en el JWT tras autenticar
+    // Codifica id, role y otpEnabled en el JWT tras autenticar
     jwt({ token, user }) {
       if (user) {
-        const u = user as { role?: string; id?: string };
+        const u = user as { role?: string; id?: string; otpEnabled?: boolean };
         token.role = u.role;
         token.id = u.id ?? token.sub;
+        token.otpEnabled = u.otpEnabled ?? false;
       }
       return token;
     },
 
-    // Expone id y role del JWT a useSession() y auth()
+    // Expone id, role y otpEnabled del JWT a useSession() y auth()
     session({ session, token }) {
       const u = session.user as any;
       u.id = token.id ?? token.sub;
       u.role = token.role;
+      u.otpEnabled = token.otpEnabled ?? false;
       return session;
     },
   },

@@ -16,6 +16,7 @@ function mapToProfile(user: {
   email?: string | null;
   name?: string | null;
   role?: string;
+  otpEnabled?: boolean;
 }): Profile {
   return {
     id: user.id ?? "",
@@ -24,6 +25,7 @@ function mapToProfile(user: {
     role: (user.role === "admin" ? "admin" : "user") as Role,
     estado: true,
     created_at: "",
+    otpEnabled: user.otpEnabled ?? false,
   };
 }
 

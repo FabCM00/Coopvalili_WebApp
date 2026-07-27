@@ -39,9 +39,9 @@ export function UserMenu() {
       {/* Trigger */}
       <button
         onClick={() => setOpen((v) => !v)}
-        className="group flex items-center gap-2.5 rounded-xl p-1.5 outline-none transition-all hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-[#F29A2E] active:scale-[0.98]"
+        className="group flex items-center gap-2.5 rounded-xl p-1.5 outline-none transition-all hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-brand-orange active:scale-[0.98]"
       >
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#F29A2E] to-[#d87c14] text-sm font-bold text-white shadow-sm ring-2 ring-white">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-orange to-[#d87c14] text-sm font-bold text-white shadow-sm ring-2 ring-white">
           {initial}
         </div>
         <div className="hidden flex-col items-start text-left sm:flex">

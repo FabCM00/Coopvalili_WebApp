@@ -19,6 +19,13 @@ export interface Profile {
   role: "admin" | "user";
   estado: boolean;
   created_at: string;
+  otpEnabled: boolean;
+}
+
+interface RequestOtpResult {
+  ok: boolean;
+  message?: string;
+  otpRequired?: boolean;
 }
 
 interface AuthContextType {
@@ -27,7 +34,8 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   isLoggingOut: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  requestOtp: (email: string, password: string) => Promise<RequestOtpResult>;
+  login: (email: string, password: string, otp?: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<Profile | null>;
 }
@@ -40,6 +48,7 @@ function mapToProfile(
     email?: string | null;
     name?: string | null;
     role?: string;
+    otpEnabled?: boolean;
   } | null,
 ): Profile | null {
   if (!user?.email || !user.id) return null;
@@ -50,6 +59,7 @@ function mapToProfile(
     role: user.role === "admin" ? "admin" : "user",
     estado: true, // Solo llegan aquí usuarios activos
     created_at: "",
+    otpEnabled: user.otpEnabled ?? false,
   };
 }
 
@@ -65,12 +75,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     sessionUser as Parameters<typeof mapToProfile>[0],
   );
 
+  const requestOtp = useCallback(
+    async (email: string, password: string): Promise<RequestOtpResult> => {
+      setError(null);
+      try {
+        const prefix = process.env.NEXT_PUBLIC_URL_PREFIX || "";
+        const res = await fetch(`${prefix}/api/auth/send-otp`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok || !data.ok) {
+          return {
+            ok: false,
+            message: data.message ?? "Correo o contraseña incorrectos.",
+          };
+        }
+
+        return { ok: true, otpRequired: data.otpRequired ?? true };
+      } catch {
+        return {
+          ok: false,
+          message: "No se pudo enviar el código. Intenta de nuevo.",
+        };
+      }
+    },
+    [],
+  );
+
   const login = useCallback(
-    async (email: string, password: string) => {
+    async (email: string, password: string, otp?: string) => {
       setError(null);
       const result = await signIn("credentials", {
         email,
         password,
+        ...(otp ? { otp } : {}),
         redirect: false,
       });
 
@@ -130,6 +172,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         loading,
         error,
         isLoggingOut,
+        requestOtp,
         login,
         logout,
         refreshProfile,
@@ -149,7 +192,10 @@ export const useAuth = () => {
 function traducirError(code: string): string {
   if (code === "InactiveAccount")
     return "Tu cuenta ha sido desactivada. Contacta al administrador.";
-  if (code === "CredentialsSignin") return "Correo o contraseña incorrectos.";
+  if (code === "OtpRequired" || code === "InvalidOtp")
+    return "Código inválido o expirado. Solicita uno nuevo.";
+  if (code === "CredentialsSignin")
+    return "Código o credenciales incorrectos.";
   if (/rate/i.test(code)) return "Demasiados intentos. Espera un momento.";
-  return "Correo o contraseña incorrectos.";
+  return "Código o credenciales incorrectos.";
 }

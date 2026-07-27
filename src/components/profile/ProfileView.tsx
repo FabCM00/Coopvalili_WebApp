@@ -12,8 +12,10 @@ import {
   ChevronDown,
   Database,
   RefreshCw,
+  KeyRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Switch } from "@/components/ui/switch";
 
 export function ProfileView() {
   const { profile } = useAuth();
@@ -23,6 +25,13 @@ export function ProfileView() {
   const [showPwd, setShowPwd] = useState(false);
   const [pwLoading, setPwLoading] = useState(false);
   const [pwResult, setPwResult] = useState<{ ok: boolean; msg: string } | null>(
+    null,
+  );
+
+  const [otpOpen, setOtpOpen] = useState(false);
+  const [otpEnabled, setOtpEnabled] = useState(profile?.otpEnabled ?? false);
+  const [otpSaving, setOtpSaving] = useState(false);
+  const [otpResult, setOtpResult] = useState<{ ok: boolean; msg: string } | null>(
     null,
   );
 
@@ -67,6 +76,10 @@ export function ProfileView() {
       clearInterval(id);
     };
   }, [refreshTick]);
+
+  useEffect(() => {
+    if (profile) setOtpEnabled(profile.otpEnabled);
+  }, [profile]);
 
   if (!profile) return null;
 
@@ -119,6 +132,37 @@ export function ProfileView() {
       setPwResult({ ok: false, msg: "Error de conexión. Inténtalo de nuevo." });
     } finally {
       setPwLoading(false);
+    }
+  };
+
+  const handleToggleOtp = async (checked: boolean) => {
+    setOtpSaving(true);
+    setOtpResult(null);
+    try {
+      const res = await fetch("/api/auth/toggle-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: checked }),
+      });
+      const json = (await res.json()) as { ok: boolean; message?: string };
+      if (!json.ok) {
+        setOtpResult({
+          ok: false,
+          msg: json.message || "No se pudo actualizar.",
+        });
+        return;
+      }
+      setOtpEnabled(checked);
+      setOtpResult({
+        ok: true,
+        msg: checked
+          ? "Verificación en dos pasos activada. Se pedirá desde tu próximo inicio de sesión."
+          : "Verificación en dos pasos desactivada.",
+      });
+    } catch {
+      setOtpResult({ ok: false, msg: "Error de conexión. Inténtalo de nuevo." });
+    } finally {
+      setOtpSaving(false);
     }
   };
 
@@ -370,6 +414,61 @@ export function ProfileView() {
                 </button>
               </div>
             </form>
+          </div>
+        )}
+      </div>
+
+      {/* Card acordeón — Verificación en dos pasos (OTP) */}
+      <div className="bg-white border border-[#0D0D0D]/10">
+        <button
+          type="button"
+          onClick={() => {
+            setOtpOpen((v) => !v);
+            setOtpResult(null);
+          }}
+          className="flex w-full items-center justify-between px-6 py-4 text-left transition hover:bg-[#0D0D0D]/[0.02]"
+        >
+          <div className="flex items-center gap-3">
+            <KeyRound className="h-4 w-4 text-[#012340]/50" />
+            <span className="text-sm font-bold text-[#012340]">
+              Verificación en dos pasos
+            </span>
+          </div>
+          <ChevronDown
+            className={cn(
+              "h-4 w-4 text-[#0D0D0D]/35 transition-transform duration-200",
+              otpOpen && "rotate-180",
+            )}
+          />
+        </button>
+
+        {otpOpen && (
+          <div className="border-t border-[#0D0D0D]/8 px-6 py-5">
+            <div className="flex items-center justify-between gap-4 max-w-sm">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-[#0D0D0D]/80">
+                  Pedir un código por correo al iniciar sesión
+                </p>
+                <p className="mt-1 text-xs text-[#0D0D0D]/45">
+                  Refuerza la seguridad de tu cuenta. Solo tú puedes
+                  activarla o desactivarla.
+                </p>
+              </div>
+              <Switch
+                checked={otpEnabled}
+                onCheckedChange={handleToggleOtp}
+                disabled={otpSaving}
+              />
+            </div>
+
+            {otpResult && (
+              <p
+                className={`mt-4 text-sm font-medium ${otpResult.ok ? "text-green-700" : "text-red-600"
+                  }`}
+              >
+                {otpResult.msg}
+              </p>
+            )}
           </div>
         )}
       </div>

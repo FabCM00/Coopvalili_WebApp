@@ -34,11 +34,14 @@ export async function GET(req: NextRequest) {
   const where = buildBandejaWhere({ cedulaFilter, q, gestionado });
 
   try {
-    const [totalActivas, totalGestionadas] = await withPrismaRetry(() =>
-      Promise.all([
-        prisma.valida1_results.count({ where: buildGestionWhere(cedulaFilter, false) }),
-        prisma.valida1_results.count({ where: buildGestionWhere(cedulaFilter, true) }),
-      ]),
+    // Secuencial a propósito: el pool es pequeño (connection_limit=3) y varias
+    // queries en paralelo desde el mismo handler compiten entre sí y con las de
+    // otras pestañas, agotando los slots de Postgres.
+    const totalActivas = await withPrismaRetry(() =>
+      prisma.valida1_results.count({ where: buildGestionWhere(cedulaFilter, false) }),
+    );
+    const totalGestionadas = await withPrismaRetry(() =>
+      prisma.valida1_results.count({ where: buildGestionWhere(cedulaFilter, true) }),
     );
 
     if (estadoParam) {

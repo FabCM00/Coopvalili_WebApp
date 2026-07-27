@@ -52,6 +52,7 @@ export const bandeja = {
       cedulaFilter?: string;
       q?: string;
       gestionado?: boolean;
+      estado?: SolicitudEstado;
     } = {},
   ): Promise<Result<SolicitudesPage>> {
     const qs = new URLSearchParams({
@@ -61,7 +62,24 @@ export const bandeja = {
     if (opts.cedulaFilter) qs.set("cedulaFilter", opts.cedulaFilter);
     if (opts.q) qs.set("q", opts.q);
     if (opts.gestionado !== undefined) qs.set("gestionado", String(opts.gestionado));
+    if (opts.estado) qs.set("estado", opts.estado);
     return request<SolicitudesPage>(`${PREFIX}/api/usuario/bandeja?${qs}`);
+  },
+
+  getConteoPorEstado(
+    opts: {
+      cedulaFilter?: string;
+      q?: string;
+      gestionado?: boolean;
+    } = {},
+  ): Promise<Result<Record<"todos" | SolicitudEstado, number>>> {
+    const qs = new URLSearchParams();
+    if (opts.cedulaFilter) qs.set("cedulaFilter", opts.cedulaFilter);
+    if (opts.q) qs.set("q", opts.q);
+    if (opts.gestionado !== undefined) qs.set("gestionado", String(opts.gestionado));
+    return request<Record<"todos" | SolicitudEstado, number>>(
+      `${PREFIX}/api/usuario/bandeja/conteo-estado?${qs}`,
+    );
   },
 
   getSolicitud(radicado: string): Promise<Result<SolicitudUI>> {

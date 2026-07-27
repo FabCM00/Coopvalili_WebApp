@@ -71,7 +71,7 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
     error: queryError,
     refetch,
   } = useQuery({
-    queryKey: ["solicitudes", cedulaFilter, page, vistaGestionados, query] as const,
+    queryKey: ["solicitudes", cedulaFilter, page, vistaGestionados, query, filtro] as const,
     queryFn: async () => {
       const r = await bandeja.listSolicitudes({
         limit: PAGE_SIZE,
@@ -79,12 +79,34 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
         cedulaFilter,
         q: query || undefined,
         gestionado: vistaGestionados,
+        estado: filtro === "todos" ? undefined : filtro,
       });
       if (!r.ok) throw new Error(r.error.message);
-      return r.data as SolicitudesPage;
+      return { ...r.data, filtroKey: filtro, pageKey: page } as SolicitudesPage & {
+        filtroKey: FiltroTab;
+        pageKey: number;
+      };
     },
     refetchInterval: 30_000,
     placeholderData: (prev) => prev,
+  });
+
+  const {
+    data: conteoResult,
+    error: conteoError,
+    refetch: refetchConteo,
+  } = useQuery({
+    queryKey: ["solicitudes-conteo", cedulaFilter, vistaGestionados, query] as const,
+    queryFn: async () => {
+      const r = await bandeja.getConteoPorEstado({
+        cedulaFilter,
+        q: query || undefined,
+        gestionado: vistaGestionados,
+      });
+      if (!r.ok) throw new Error(r.error.message);
+      return r.data;
+    },
+    refetchInterval: 30_000,
   });
 
   const solicitudes = result?.data ?? [];
@@ -92,6 +114,12 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
   const totalPages = result?.totalPages ?? 1;
   const totalActivas = result?.totalActivas ?? 0;
   const totalGestionadas = result?.totalGestionadas ?? 0;
+  const isFilterChange = Boolean(
+    refreshing && result && result.filtroKey !== filtro,
+  );
+  const isPageChange = Boolean(
+    refreshing && result && result.filtroKey === filtro && result.pageKey !== page,
+  );
 
   const { data: selectedDetail = null, isLoading: detailLoading } = useQuery({
     queryKey: ["solicitud", selectedRadicado],
@@ -111,6 +139,7 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["solicitudes"] });
+      qc.invalidateQueries({ queryKey: ["solicitudes-conteo"] });
       setSelectedRadicado(null);
       setConfirmRadicado(null);
     },
@@ -120,14 +149,19 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
     },
   });
 
-  const error = (queryError as Error | null)?.message ?? mutationError;
+  const error =
+    (queryError as Error | null)?.message ??
+    (conteoError as Error | null)?.message ??
+    mutationError;
 
   useEffect(() => {
     const t = setTimeout(() => setQuery(rawQuery), 250);
     return () => clearTimeout(t);
   }, [rawQuery]);
 
-  const handleRefresh = async () => { await refetch(); };
+  const handleRefresh = async () => {
+    await Promise.all([refetch(), refetchConteo()]);
+  };
   const filtrosActivos = filtro !== "todos" ? 1 : 0;
   const handleLimpiarFiltros = () => setFiltro("todos");
   const handleGestionar = (radicado: string) => setConfirmRadicado(radicado);
@@ -136,20 +170,11 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
     gestionarMutation.mutate(confirmRadicado);
   };
 
-  // Estado filter es client-side sobre la página actual (estado no está en DB)
-  const conteoPorEstado = useMemo(() => {
-    const conteo = new Map<FiltroTab, number>();
-    for (const s of solicitudes) {
-      conteo.set(s.estado, (conteo.get(s.estado) ?? 0) + 1);
-    }
-    conteo.set("todos", solicitudes.length);
-    return conteo;
-  }, [solicitudes]);
-
-  const pageRows = useMemo(() => {
-    if (filtro === "todos") return solicitudes;
-    return solicitudes.filter((s) => s.estado === filtro);
-  }, [solicitudes, filtro]);
+  const conteoPorEstado = useMemo(
+    () => new Map<FiltroTab, number>(Object.entries(conteoResult ?? {}) as [FiltroTab, number][]),
+    [conteoResult],
+  );
+  const pageRows = solicitudes;
 
   const pageStart = (page - 1) * PAGE_SIZE;
 
@@ -345,7 +370,9 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
             </div>
 
             <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
-              {loading ? (
+              {isFilterChange ? (
+                <LoadingScreen message="Aplicando filtro…" fullScreen={false} />
+              ) : loading || isPageChange ? (
                 <div className="flex flex-col">
                   {SKELETON_ROWS.map((i) => (
                     <div key={i} className="px-4 py-3 border-b border-[#0D0D0D]/5 animate-pulse">
@@ -410,7 +437,7 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
               )}
             </div>
 
-            {!loading && totalPages > 1 && (
+            {!loading && !isFilterChange && !isPageChange && totalPages > 1 && (
               <Paginator
                 page={page}
                 totalPages={totalPages}

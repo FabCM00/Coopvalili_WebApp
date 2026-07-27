@@ -1,18 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
 import { auth } from "../../../../../auth";
 import { prisma } from "@/lib/prisma";
-import { buildResumen } from "@/lib/bandeja-mappers";
+import {
+  BANDEJA_INCLUDE,
+  buildBandejaWhere,
+  buildGestionWhere,
+  isSolicitudEstado,
+  mapBandejaRows,
+} from "@/lib/bandeja-query";
 import { withPrismaRetry } from "@/lib/prisma-retry";
 
-// ─────────────────────────────────────────────────────────────────────────────
 // GET — página de solicitudes (resumen ligero, sin payloads crudos).
-// El detalle completo se consulta aparte por radicado en [radicado]/route.ts.
-//
-// `q` solo filtra por columnas reales (cedula/radicado): `solicitante` es
-// derivado de JSON en buildResumen, no una columna, así que no se puede
-// filtrar por nombre en SQL sin aplanar ese campo en la tabla.
-// ─────────────────────────────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user) {
@@ -20,53 +18,76 @@ export async function GET(req: NextRequest) {
   }
 
   const sp = req.nextUrl.searchParams;
-  const limit = parseInt(sp.get("limit") || "20");
-  const page = Math.max(1, parseInt(sp.get("page") || "1"));
+  const limit = Math.min(100, Math.max(1, Number.parseInt(sp.get("limit") || "20", 10)));
+  const page = Math.max(1, Number.parseInt(sp.get("page") || "1", 10));
   const cedulaFilter = sp.get("cedulaFilter") || undefined;
   const q = sp.get("q")?.trim() || undefined;
   const gestionadoParam = sp.get("gestionado");
+  const gestionado =
+    gestionadoParam === "true" ? true : gestionadoParam === "false" ? false : undefined;
+  const estadoParam = sp.get("estado");
 
-  const where: Prisma.valida1_resultsWhereInput = {};
-  if (cedulaFilter) where.cedula = cedulaFilter;
-  if (q) {
-    where.OR = [
-      { cedula: { contains: q, mode: "insensitive" } },
-      { radicado: { contains: q, mode: "insensitive" } },
-    ];
+  if (estadoParam && !isSolicitudEstado(estadoParam)) {
+    return NextResponse.json({ ok: false, message: "Estado inválido." }, { status: 400 });
   }
-  if (gestionadoParam === "true") where.gestionado_at = { not: null };
-  else if (gestionadoParam === "false") where.gestionado_at = null;
+
+  const where = buildBandejaWhere({ cedulaFilter, q, gestionado });
 
   try {
-    const [rows, total, totalActivas, totalGestionadas] = await withPrismaRetry(() =>
+    const [totalActivas, totalGestionadas] = await withPrismaRetry(() =>
+      Promise.all([
+        prisma.valida1_results.count({ where: buildGestionWhere(cedulaFilter, false) }),
+        prisma.valida1_results.count({ where: buildGestionWhere(cedulaFilter, true) }),
+      ]),
+    );
+
+    if (estadoParam) {
+      const rows = await withPrismaRetry(() =>
+        prisma.valida1_results.findMany({
+          where,
+          include: BANDEJA_INCLUDE,
+          orderBy: { created_at: "desc" },
+        }),
+      );
+      const filtered = mapBandejaRows(rows).filter((row) => row.estado === estadoParam);
+      const total = filtered.length;
+      const totalPages = Math.max(1, Math.ceil(total / limit));
+      const start = (page - 1) * limit;
+
+      return NextResponse.json({
+        ok: true,
+        data: {
+          data: filtered.slice(start, start + limit),
+          total,
+          totalPages,
+          totalActivas,
+          totalGestionadas,
+        },
+      });
+    }
+
+    const [rows, total] = await withPrismaRetry(() =>
       Promise.all([
         prisma.valida1_results.findMany({
           where,
-          include: {
-            motor_process_results: true,
-            motor_data_results: { orderBy: { created_at: "desc" }, take: 1 },
-            identity_validations: true,
-            credito_decisiones: true,
-          },
+          include: BANDEJA_INCLUDE,
           orderBy: { created_at: "desc" },
           skip: (page - 1) * limit,
           take: limit,
         }),
         prisma.valida1_results.count({ where }),
-        prisma.valida1_results.count({
-          where: { ...(cedulaFilter ? { cedula: cedulaFilter } : {}), gestionado_at: null },
-        }),
-        prisma.valida1_results.count({
-          where: { ...(cedulaFilter ? { cedula: cedulaFilter } : {}), gestionado_at: { not: null } },
-        }),
       ]),
     );
 
-    const data = rows.map(buildResumen);
-    const totalPages = Math.max(1, Math.ceil(total / limit));
     return NextResponse.json({
       ok: true,
-      data: { data, total, totalPages, totalActivas, totalGestionadas },
+      data: {
+        data: mapBandejaRows(rows),
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+        totalActivas,
+        totalGestionadas,
+      },
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Error interno.";
@@ -74,9 +95,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // PATCH — marcar una solicitud como gestionada.
-// ─────────────────────────────────────────────────────────────────────────────
 export async function PATCH(req: NextRequest) {
   const session = await auth();
   if (!session?.user) {

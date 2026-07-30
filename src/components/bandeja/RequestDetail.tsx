@@ -35,6 +35,9 @@ export function RequestDetail({ solicitud, activeTab }: RequestDetailProps) {
             cedula={solicitud.cedula}
             solicitante={solicitud.solicitante}
             radicado={solicitud.radicado}
+            // Prellenan el modal de firma; `raw` solo está en el detalle cargado.
+            email={detail?.raw.valida1.email}
+            celular={detail?.raw.valida1.celular ?? detail?.raw.valida1.telefono}
           />
         ) : detail ? (
           <>

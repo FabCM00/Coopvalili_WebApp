@@ -61,11 +61,19 @@ export const authConfig = {
       const isLoggedIn = !!user;
       const role = user?.role;
 
-      const isApiRoute = nextUrl.pathname.startsWith("/api/");
+      // Webhooks de proveedores externos: no tienen sesión en esta app, así que
+      // quedan fuera del guard. Cada uno valida su propio secreto compartido
+      // (ver src/app/api/webhooks/*/route.ts).
+      const isWebhookRoute = nextUrl.pathname.startsWith("/api/webhooks/");
+
+      const isApiRoute =
+        nextUrl.pathname.startsWith("/api/") && !isWebhookRoute;
       const isAdminRoute = nextUrl.pathname.startsWith("/admin");
       const isUserRoute = nextUrl.pathname.startsWith("/usuario");
       const isLoginRoute = nextUrl.pathname === "/login";
       const isProtectedRoute = isAdminRoute || isUserRoute || isApiRoute;
+
+      if (isWebhookRoute) return true;
 
       // Rutas API sin sesión → 401 JSON (no redirect al login)
       if (isApiRoute && !isLoggedIn) {

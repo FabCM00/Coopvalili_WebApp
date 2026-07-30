@@ -3,11 +3,15 @@ import {
   CheckCircle2,
   Clock3,
   Circle,
+  FileSignature,
   Image as ImageIcon,
+  ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
 
+/** Base de las rutas de documentos (ver src/app/api/usuario/documentos/). */
 export const API = "/api/usuario/documentos";
+
 export const VALID_FILE_TYPES = [
   "application/pdf",
   "image/jpeg",
@@ -24,30 +28,58 @@ export const COMMUNICATIONS_URL =
     "https://connect.truora.com") +
   "/#/engagement/?navbarTab=assigned&statusTab=open";
 
-export type DocStatus = "pendiente" | "revision" | "validado";
+/**
+ * Estados de un documento. Espeja DOCUMENTO_ESTADOS de @/lib/documentos.
+ * `pendiente_firma` y `firmado` los asigna el sistema (flujo de firma): se
+ * muestran como badge pero nunca se ofrecen como acción manual.
+ */
+export type DocStatus =
+  | "pendiente"
+  | "revision"
+  | "validado"
+  | "pendiente_firma"
+  | "firmado";
 
+/** Forma que devuelve la API (DocumentoDTO en @/lib/documentos). */
 export interface Documento {
   id: string;
-  name: string;
-  size: number;
-  contentType: string;
-  uploadedAt: string;
-  category: string;
-  status: DocStatus;
+  radicado: string;
+  cedula: string;
+  nombre: string;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  tipoDocumento: string;
+  estado: DocStatus;
+  sha256: string | null;
+  createdAt: string;
+  updatedAt: string;
+  subidoPor: string | null;
 }
 
 /** Carpeta por defecto cuando se carga un documento sin indicar el tipo. */
-export const DEFAULT_CATEGORY = "Documentos generales";
+export const DEFAULT_TIPO = "Documentos generales";
 
 export const STATUS_CONFIG: Record<
   DocStatus,
   { label: string; badge: string; dot: string; icon: LucideIcon }
 > = {
+  firmado: {
+    label: "Firmado",
+    badge: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    dot: "bg-emerald-600",
+    icon: ShieldCheck,
+  },
   validado: {
     label: "Validado",
     badge: "bg-emerald-50 text-emerald-700 border-emerald-200",
     dot: "bg-emerald-500",
     icon: CheckCircle2,
+  },
+  pendiente_firma: {
+    label: "Pendiente de firma",
+    badge: "bg-blue-50 text-blue-700 border-blue-200",
+    dot: "bg-blue-500",
+    icon: FileSignature,
   },
   revision: {
     label: "En revisión",
@@ -63,14 +95,46 @@ export const STATUS_CONFIG: Record<
   },
 };
 
+/**
+ * Estados que el colaborador puede asignar a mano. `pendiente_firma` y `firmado`
+ * quedan fuera a propósito: los pone el flujo de firma, y permitir marcarlos
+ * manualmente vaciaría de valor el estado. Espeja ESTADOS_MANUALES del lib.
+ */
 export const STATUS_OPTIONS: DocStatus[] = [
   "pendiente",
   "revision",
   "validado",
 ];
 
-export function formatFileSize(bytes: number): string {
-  if (bytes === 0) return "0 Bytes";
+/**
+ * Un documento gobernado por el flujo de firma no admite cambio de estado ni
+ * eliminación manual: el servidor lo rechaza con 409 y la UI lo refleja
+ * deshabilitando las acciones.
+ */
+export function esEstadoDeSistema(status: DocStatus): boolean {
+  return !STATUS_OPTIONS.includes(status);
+}
+
+/** Orden de la barra de resumen: del estado más avanzado al inicial. */
+export const STATUS_SUMMARY_ORDER: DocStatus[] = [
+  "firmado",
+  "validado",
+  "pendiente_firma",
+  "revision",
+  "pendiente",
+];
+
+/** Plural para la barra de resumen ("2 validados · 1 en revisión"). */
+export const STAT_LABEL: Record<DocStatus, string> = {
+  firmado: "firmados",
+  validado: "validados",
+  pendiente_firma: "pendientes de firma",
+  revision: "en revisión",
+  pendiente: "pendientes",
+};
+
+export function formatFileSize(bytes: number | null): string {
+  if (bytes === null || bytes === 0) return "—";
   const k = 1024;
   const sizes = ["Bytes", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -88,7 +152,7 @@ export function formatDate(iso: string): string {
 }
 
 /** Etiqueta corta del tipo de archivo: "PDF", "JPG", "PNG", "XLSX", "DOCX"… */
-export function fileExtLabel(contentType: string): string {
+export function fileExtLabel(contentType: string | null): string {
   const map: Record<string, string> = {
     "application/pdf": "PDF",
     "image/png": "PNG",
@@ -99,7 +163,7 @@ export function fileExtLabel(contentType: string): string {
       "DOCX",
     "application/msword": "DOC",
   };
-  return map[contentType] ?? "Archivo";
+  return map[contentType ?? ""] ?? "Archivo";
 }
 
 /** Nombre legible: sin la extensión (el tipo ya se muestra en la metadata). */
@@ -107,13 +171,15 @@ export function displayName(name: string): string {
   return name.replace(/\.[a-zA-Z0-9]+$/, "");
 }
 
-/** Construye la URL del endpoint que sirve el archivo (ver inline / descargar). */
+/**
+ * URL del endpoint que sirve el archivo. El `radicado` va como control de
+ * acceso: la API verifica que el documento pertenezca a esa solicitud.
+ */
 export function fileUrl(
-  cedula: string,
   doc: Documento,
   mode: "view" | "download",
 ): string {
-  return `${API}/download?cedula=${encodeURIComponent(cedula)}&id=${encodeURIComponent(doc.id)}&mode=${mode}`;
+  return `${API}/download?id=${encodeURIComponent(doc.id)}&radicado=${encodeURIComponent(doc.radicado)}&mode=${mode}`;
 }
 
 const FILE_ICONS: Record<string, { src: string; alt: string }> = {
@@ -131,8 +197,8 @@ const FILE_ICONS: Record<string, { src: string; alt: string }> = {
 };
 
 /** Miniatura del archivo: usa el ícono correspondiente según el tipo de archivo. */
-export function FileThumb({ contentType }: { contentType: string }) {
-  const icon = FILE_ICONS[contentType];
+export function FileThumb({ contentType }: { contentType: string | null }) {
+  const icon = FILE_ICONS[contentType ?? ""];
   if (icon) {
     return (
       <Image

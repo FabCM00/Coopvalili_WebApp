@@ -26,6 +26,7 @@ import {
   X,
 } from "lucide-react";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { BusyOverlay } from "@/components/BusyOverlay";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -82,9 +83,15 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
         estado: filtro === "todos" ? undefined : filtro,
       });
       if (!r.ok) throw new Error(r.error.message);
-      return { ...r.data, filtroKey: filtro, pageKey: page } as SolicitudesPage & {
+      return {
+        ...r.data,
+        filtroKey: filtro,
+        pageKey: page,
+        vistaKey: vistaGestionados,
+      } as SolicitudesPage & {
         filtroKey: FiltroTab;
         pageKey: number;
+        vistaKey: boolean;
       };
     },
     refetchInterval: 30_000,
@@ -114,11 +121,20 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
   const totalPages = result?.totalPages ?? 1;
   const totalActivas = result?.totalActivas ?? 0;
   const totalGestionadas = result?.totalGestionadas ?? 0;
+  // Cambio de pestaña Activas ↔ Gestionadas: velo a pantalla completa, porque
+  // cambia toda la lista y no solo un filtro dentro de ella.
+  const isVistaChange = Boolean(
+    refreshing && result && result.vistaKey !== vistaGestionados,
+  );
   const isFilterChange = Boolean(
-    refreshing && result && result.filtroKey !== filtro,
+    !isVistaChange && refreshing && result && result.filtroKey !== filtro,
   );
   const isPageChange = Boolean(
-    refreshing && result && result.filtroKey === filtro && result.pageKey !== page,
+    !isVistaChange &&
+      refreshing &&
+      result &&
+      result.filtroKey === filtro &&
+      result.pageKey !== page,
   );
 
   const { data: selectedDetail = null, isLoading: detailLoading } = useQuery({
@@ -137,11 +153,16 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
       if (!r.ok) throw new Error(r.error.message);
       return r;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["solicitudes"] });
-      qc.invalidateQueries({ queryKey: ["solicitudes-conteo"] });
+    onSuccess: async () => {
       setSelectedRadicado(null);
       setConfirmRadicado(null);
+      // Se esperan las recargas dentro de la mutación para que `isPending` (y con
+      // él el velo de carga) siga activo hasta que la lista ya esté reordenada:
+      // con invalidateQueries sin await, el velo desaparecía antes.
+      await Promise.all([
+        qc.refetchQueries({ queryKey: ["solicitudes"] }),
+        qc.refetchQueries({ queryKey: ["solicitudes-conteo"] }),
+      ]);
     },
     onError: (e: Error) => {
       setMutationError(`Error al gestionar: ${e.message}`);
@@ -536,6 +557,13 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Gestionar mueve la solicitud de "Activas" a "Gestionadas" y recarga
+          varias consultas: el velo cubre toda la vista hasta que la lista quedó
+          reordenada (ver el await en onSuccess de la mutación). */}
+      {gestionarMutation.isPending && (
+        <BusyOverlay message="Cargando solicitudes" fullScreen />
       )}
     </div>
   );

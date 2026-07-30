@@ -237,16 +237,7 @@ export function ResumenSolicitud({ solicitud }: { solicitud: SolicitudUI }) {
   const mp = solicitud.raw.motor_process;
   const md = solicitud.raw.motor_data;
   const iv = solicitud.raw.identity_validation;
-  const cd = solicitud.raw.credito_decision;
   const mpProcessing = (mp?.response_json as any)?.processing ?? null;
-  const opcionElegidaId =
-    cd?.opcion_elegida === "B1"
-      ? 1
-      : cd?.opcion_elegida === "B2"
-        ? 2
-        : cd?.opcion_elegida === "B3"
-          ? 3
-          : null;
 
   return (
     <div className="p-4 flex flex-col gap-5">
@@ -278,12 +269,14 @@ export function ResumenSolicitud({ solicitud }: { solicitud: SolicitudUI }) {
           currency
           highlight
         />
-        <GridField
-          label="Monto definitivo"
-          value={mp?.monto_definitivo}
-          currency
-          highlight
-        />
+        {mp?.instancia_aprobacion !== 1 && (
+          <GridField
+            label="Monto definitivo"
+            value={mp?.monto_definitivo}
+            currency
+            highlight
+          />
+        )}
         <GridField label="Línea de crédito" value={md?.linea_credito} />
         {mpProcessing?.perfil != null && (
           <GridField label="Perfil" value={mpProcessing.perfil} />
@@ -305,18 +298,23 @@ export function ResumenSolicitud({ solicitud }: { solicitud: SolicitudUI }) {
             currency
           />
         )}
-        {mpProcessing?.conceptoDefinitivo != null && (
-          <GridField
-            label="Concepto definitivo"
-            value={mpProcessing.conceptoDefinitivo}
-          />
-        )}
-        {mpProcessing?.cuotaDefinitiva != null && (
-          <GridField
-            label="Cuota definitiva"
-            value={mpProcessing.cuotaDefinitiva}
-          />
-        )}
+        {/* Concepto y cuota definitiva viven en la sección "Oferta" (solo
+            visible con instancia_aprobacion === 1). Aquí se muestran únicamente
+            cuando no hay oferta, para no duplicarlos. */}
+        {mp?.instancia_aprobacion !== 1 &&
+          mpProcessing?.conceptoDefinitivo != null && (
+            <GridField
+              label="Concepto definitivo"
+              value={mpProcessing.conceptoDefinitivo}
+            />
+          )}
+        {mp?.instancia_aprobacion !== 1 &&
+          mpProcessing?.cuotaDefinitiva != null && (
+            <GridField
+              label="Cuota definitiva"
+              value={mpProcessing.cuotaDefinitiva}
+            />
+          )}
         {mpProcessing?.frecuenciaMes != null && (
           <GridField
             label="Frecuencia de pago"
@@ -355,110 +353,27 @@ export function ResumenSolicitud({ solicitud }: { solicitud: SolicitudUI }) {
         </GridSection>
       )}
 
-      {mp &&
-        (mp.monto_credito_b1 != null ||
-          mp.monto_credito_b2 != null ||
-          mp.monto_credito_b3 != null) && (
-          <div>
-            <p className="text-[10px] font-bold tracking-[0.18em] uppercase text-[#0D0D0D]/35 mb-2 px-1">
-              Opciones de Crédito (Escenarios)
-            </p>
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                {
-                  id: 1,
-                  cumple: mp.cumple_4_criterios_b1,
-                  monto: mp.monto_credito_b1,
-                  cap: mp.cuota_b1,
-                },
-                {
-                  id: 2,
-                  cumple: mp.cumple_4_criterios_b2,
-                  monto: mp.monto_credito_b2,
-                  cap: mp.cuota_b2,
-                },
-                {
-                  id: 3,
-                  cumple: mp.cumple_4_criterios_b3,
-                  monto: mp.monto_credito_b3,
-                  cap: mp.cuota_b3,
-                },
-              ]
-                .filter(
-                  (opt) =>
-                    opt.monto != null || opt.cap != null || opt.cumple != null,
-                )
-                .map((opt) => {
-                  const isViable =
-                    opt.cumple === 1 ||
-                    opt.cumple === "1" ||
-                    Number(opt.cumple) === 1;
-                  const isElegida = opt.id === opcionElegidaId;
-                  return (
-                    <div
-                      key={opt.id}
-                      className={`flex flex-col border rounded-sm overflow-hidden ${isElegida ? "border-[#012340] ring-1 ring-[#012340]/30" : isViable ? "border-green-200 bg-green-50/30" : "border-[#0D0D0D]/10 bg-[#0D0D0D]/[0.02] opacity-80"}`}
-                    >
-                      <div
-                        className={`flex flex-wrap gap-1 items-center justify-between px-3 py-2 border-b ${isElegida ? "bg-[#012340] border-[#012340]" : isViable ? "bg-green-100/50 border-green-200" : "bg-[#0D0D0D]/[0.04] border-[#0D0D0D]/10"}`}
-                      >
-                        <span
-                          className={`text-[11px] font-bold ${isElegida ? "text-white" : isViable ? "text-green-800" : "text-[#0D0D0D]/50"}`}
-                        >
-                          Opción {opt.id}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          {isElegida && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wide bg-white/25 text-white">
-                              Elegida
-                            </span>
-                          )}
-                          <span
-                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wide ${isElegida ? "bg-white/15 text-white/80" : isViable ? "bg-green-500 text-white" : "bg-[#0D0D0D]/15 text-[#0D0D0D]/60"}`}
-                          >
-                            {isViable ? "Viable" : "No viable"}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex flex-col gap-2 p-3">
-                        <div>
-                          <p className="text-[10px] text-[#0D0D0D]/40 mb-0.5">
-                            Monto Crédito
-                          </p>
-                          <p
-                            className={`text-sm font-bold truncate ${isElegida ? "text-[#012340]" : isViable ? "text-green-900" : "text-[#0D0D0D]/70"}`}
-                          >
-                            {fmt(opt.monto)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-[#0D0D0D]/40 mb-0.5">
-                            Cuota
-                          </p>
-                          <p className="text-xs font-medium text-[#0D0D0D]/70 truncate">
-                            {fmt(opt.cap)}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-            {cd && (
-              <div className="flex items-center gap-2 mt-3 px-3 py-2.5 bg-[#012340]/[0.04] border border-[#012340]/15">
-                <span className="text-[10px] font-bold uppercase tracking-wide text-[#012340]/50">
-                  Opción elegida por el usuario
-                </span>
-                <span className="text-[11px] font-bold text-[#012340] font-mono">
-                  {cd.opcion_elegida}
-                </span>
-                <span className="ml-auto text-[10px] text-[#0D0D0D]/35 font-mono">
-                  {cd.created_at.slice(0, 10)}
-                </span>
-              </div>
-            )}
-          </div>
-        )}
+      {mp?.instancia_aprobacion === 1 && (
+        <GridSection
+          title="Oferta"
+          tooltip="Para más información revisa la pestaña de Datos JSON."
+        >
+          {/* monto_oferta ya viene formateado del motor ("$3.500.000"): sin `currency`. */}
+          <GridField label="Monto" value={mp.monto_oferta} highlight />
+          <GridField
+            label="Cuota"
+            value={mp.cuota_periodica}
+            currency
+            highlight
+          />
+          {mp.tasa_periodica != null && (
+            <GridField label="Tasa" value={mp.tasa_periodica} />
+          )}
+          {mp.periodos != null && (
+            <GridField label="Periodos" value={`${mp.periodos} meses`} />
+          )}
+        </GridSection>
+      )}
 
       <Section title="Valida 1 — Criterios del cliente">
         <CriteriaSummary
@@ -565,7 +480,7 @@ interface JsonViewProps {
   data: any;
 }
 
-export function JsonView({ data }: JsonViewProps) {
+function JsonView({ data }: JsonViewProps) {
   const parsed = useMemo(() => deepParse(data), [data]);
   const formatted = useMemo(() => {
     try {

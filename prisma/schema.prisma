@@ -82,11 +82,109 @@ model valida1_results {
   gestionado_by         String?
   credito_decisiones    credito_decisiones?
   document_results      document_results[]
+  documentos            documentos[]
   identity_validations  identity_validations?
   motor_data_results    motor_data_results[]
   motor_process_results motor_process_results?
 
   @@index([cedula], map: "idx_valida1_cedula")
+}
+
+/// Índice de los archivos subidos. El contenido vive en Azure Blob Storage; aquí
+/// solo se guarda el puntero (container + blob_name, al estilo bucket + key de
+/// S3) junto con los metadatos y el estado. La FK a valida1_results garantiza
+/// que no se pueda adjuntar un documento a una solicitud que no existe.
+model documentos {
+  id       BigInt @id @default(autoincrement())
+  radicado String
+  cedula   String
+
+  // Puntero al blob. `container` se guarda explícito para soportar una futura
+  // migración de contenedor sin perder la referencia de los ya existentes.
+  container String @default("documentos")
+  blob_name String
+
+  // Metadatos del archivo
+  nombre_original String
+  mime_type       String?
+  size_bytes      BigInt?
+  /// SHA-256 del contenido: permite detectar que se subió dos veces el mismo archivo.
+  sha256          String? @db.Char(64)
+  /// Versión del blob en Azure (cambia con cada sobrescritura).
+  etag            String?
+
+  /// Tipo/carpeta del documento. Texto libre (p. ej. "Pagaré", "Cédula").
+  tipo_documento String @default("Documentos generales")
+
+  /// Estado del documento. Ver DOCUMENTO_ESTADOS en src/lib/documentos.ts:
+  /// pendiente | revision | validado (manuales) y
+  /// pendiente_firma | firmado (los pone el sistema vía ZapSign).
+  estado String @default("pendiente")
+
+  // Borrado lógico: nunca se borra el blob ni la fila.
+  eliminado  Boolean   @default(false)
+  deleted_at DateTime? @db.Timestamptz(6)
+
+  subido_por String?
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  valida1_results   valida1_results     @relation(fields: [radicado], references: [radicado], onUpdate: NoAction, map: "fk_documentos_valida1")
+  firma_solicitudes firma_solicitudes[]
+
+  @@unique([container, blob_name], map: "uq_documentos_blob")
+  @@index([radicado], map: "idx_documentos_radicado")
+  @@index([cedula], map: "idx_documentos_cedula")
+  @@index([radicado, estado], map: "idx_documentos_radicado_estado")
+}
+
+/// Envíos a firma electrónica (ZapSign). Un documento puede tener varios envíos
+/// (reenvíos, intentos fallidos): el vigente es el más reciente con status
+/// "pending". El webhook de ZapSign localiza la fila por `zapsign_token`.
+model firma_solicitudes {
+  id           BigInt @id @default(autoincrement())
+  documento_id BigInt
+  radicado     String
+
+  /// Token del documento en ZapSign. Es la llave que trae el webhook.
+  zapsign_token String  @unique
+  /// open_id de ZapSign (identificador numérico visible en su panel).
+  zapsign_open_id Int?
+  /// URL de firma del firmante: se le reenvía si no recibió el correo.
+  sign_url      String?
+  /// Token del firmante en ZapSign (distinto del token del documento).
+  signer_token  String?
+
+  // Datos del firmante tal como se enviaron (el firmante puede editarlos en
+  // ZapSign, así que esto es lo solicitado, no necesariamente lo final).
+  firmante_nombre String
+  firmante_email  String?
+  firmante_phone  String?
+
+  /// Canales por los que ZapSign notificó al firmante.
+  canal_email    Boolean @default(true)
+  canal_whatsapp Boolean @default(false)
+
+  /// Estado del envío: pending | signed | refused | error.
+  status String @default("pending")
+
+  /// etag del blob antes de sobrescribirlo con el PDF firmado: deja rastro de
+  /// que existió una versión sin firmar (el contenido en sí no se conserva).
+  etag_original String?
+
+  /// Payload crudo del último webhook recibido (auditoría y diagnóstico).
+  webhook_json Json?
+
+  enviado_por String?
+  created_at  DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime  @updatedAt @db.Timestamptz(6)
+  signed_at   DateTime? @db.Timestamptz(6)
+
+  documento documentos @relation(fields: [documento_id], references: [id], onDelete: Cascade, map: "fk_firma_documento")
+
+  @@index([documento_id], map: "idx_firma_documento")
+  @@index([radicado], map: "idx_firma_radicado")
+  @@index([status], map: "idx_firma_status")
 }
 
 model identity_validations {

@@ -7,15 +7,26 @@ import { useCallback, useState } from "react";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { useNotification } from "@/contexts/NotificationContext";
 import { Button } from "@/components/ui/button";
+import { BusyOverlay } from "@/components/BusyOverlay";
 import { DocumentList } from "./DocumentList";
+import { SignDocumentModal, type Firmante } from "./SignDocumentModal";
 import { UploadDocumentModal } from "./UploadDocumentModal";
 import { useDocumentos } from "./useDocumentos";
-import { COMMUNICATIONS_URL, STATUS_CONFIG, type DocStatus, type Documento } from "./utils";
+import {
+  COMMUNICATIONS_URL,
+  STATUS_CONFIG,
+  type DocStatus,
+  type Documento,
+} from "./utils";
 
 interface DocumentosTabProps {
   cedula: string;
   solicitante?: string;
+  /** Los documentos se listan por radicado: sin él no hay nada que mostrar. */
   radicado?: string;
+  /** Contacto del asociado: prellena el modal de firma (editable). */
+  email?: string | null;
+  celular?: string | null;
   /** En el modal expandido el encabezado lo pinta ModalHeader; aquí se omite. */
   showHeader?: boolean;
 }
@@ -24,15 +35,55 @@ export function DocumentosTab({
   cedula,
   solicitante,
   radicado,
+  email,
+  celular,
   showHeader = true,
 }: DocumentosTabProps) {
-  const { docs, loading, error, refetch, refresh, remove, updateStatus } =
-    useDocumentos(cedula, radicado);
+  const {
+    docs,
+    loading,
+    error,
+    refetch,
+    refresh,
+    remove,
+    updateStatus,
+    enviarAFirma,
+  } = useDocumentos(radicado);
   const { confirm, notify } = useNotification();
   const [modalOpen, setModalOpen] = useState(false);
+  /** Documento seleccionado para enviar a firma; null = modal cerrado. */
+  const [firmarDoc, setFirmarDoc] = useState<Documento | null>(null);
+  /** Mensaje del velo de trabajo; null = ninguna acción en curso. */
+  const [busy, setBusy] = useState<string | null>(null);
 
   const openModal = useCallback(() => setModalOpen(true), []);
   const closeModal = useCallback(() => setModalOpen(false), []);
+
+  const handleSign = useCallback(
+    async (
+      doc: Documento,
+      firmante: Firmante,
+      canales: { email: boolean; whatsapp: boolean },
+    ) => {
+      // El error se propaga para que el modal lo muestre en línea y el usuario
+      // pueda corregir los datos sin perder lo que escribió.
+      await enviarAFirma(doc, firmante, canales);
+      setFirmarDoc(null);
+      const via = [canales.email && "correo", canales.whatsapp && "WhatsApp"]
+        .filter(Boolean)
+        .join(" y ");
+      notify({
+        type: "success",
+        message: (
+          <>
+            Documento enviado a firma. Se notificó a{" "}
+            <span className="font-semibold">{firmante.nombre}</span> por {via}.
+          </>
+        ),
+      });
+    },
+    [enviarAFirma, notify],
+  );
 
   const handleDelete = useCallback(
     async (doc: Documento) => {
@@ -41,7 +92,7 @@ export function DocumentosTab({
         title: "Eliminar documento",
         message: (
           <>
-            ¿Eliminar <span className="font-semibold">{doc.name}</span>? Esta
+            ¿Eliminar <span className="font-semibold">{doc.nombre}</span>? Esta
             acción no se puede deshacer.
           </>
         ),
@@ -49,6 +100,7 @@ export function DocumentosTab({
         confirmTone: "danger",
       });
       if (!ok) return;
+      setBusy("Eliminando documento");
       try {
         await remove(doc);
         notify({
@@ -61,22 +113,25 @@ export function DocumentosTab({
           message:
             e instanceof Error ? e.message : "No se pudo eliminar el documento.",
         });
+      } finally {
+        setBusy(null);
       }
     },
     [confirm, notify, remove],
   );
 
   const handleUpdateStatus = useCallback(
-    async (doc: Documento, status: DocStatus) => {
+    async (doc: Documento, estado: DocStatus) => {
+      setBusy("Actualizando estado");
       try {
-        await updateStatus(doc, status);
+        await updateStatus(doc, estado);
         notify({
           type: "success",
           message: (
             <>
               Documento marcado como{" "}
               <span className="font-semibold">
-                {STATUS_CONFIG[status].label}
+                {STATUS_CONFIG[estado].label}
               </span>
               .
             </>
@@ -88,10 +143,23 @@ export function DocumentosTab({
           message:
             e instanceof Error ? e.message : "No se pudo actualizar el estado.",
         });
+      } finally {
+        setBusy(null);
       }
     },
     [updateStatus, notify],
   );
+
+  // El modal de carga se cierra al terminar la subida; el velo cubre el refresco
+  // de la lista para que no se vea el salto entre "subido" y "aparece en la lista".
+  const handleUploaded = useCallback(async () => {
+    setBusy("Guardando documento");
+    try {
+      await refresh();
+    } finally {
+      setBusy(null);
+    }
+  }, [refresh]);
 
   const header = showHeader ? (
     <div className="flex-shrink-0 border-b border-[#0D0D0D]/10 px-5 py-4">
@@ -140,7 +208,8 @@ export function DocumentosTab({
   }
 
   return (
-    <div className="flex h-full flex-col bg-white">
+    // `relative` ancla el BusyOverlay a la pestaña (no a la ventana).
+    <div className="relative flex h-full flex-col bg-white">
       {header}
 
       {docs.length === 0 ? (
@@ -167,18 +236,20 @@ export function DocumentosTab({
                 className="text-blue-600 underline"
               >
                 comunicándote con el cliente
-              </a>{" "}
-              o, si ya lo tienes,{" "}
-              <button
-                type="button"
-                onClick={openModal}
-                className="font-medium text-[#012340] underline underline-offset-2 transition-colors hover:text-[#012340]/75"
-              >
-              <a className="text-blue-600 underline" href="#" onClick={openModal}>
-                cárgalo aquí
               </a>
-            
-              </button>
+              {radicado ? (
+                <>
+                  {" "}
+                  o, si ya lo tienes,{" "}
+                  <button
+                    type="button"
+                    onClick={openModal}
+                    className="font-medium text-[#012340] underline underline-offset-2 transition-colors hover:text-[#012340]/75"
+                  >
+                    cárgalo aquí
+                  </button>
+                </>
+              ) : null}
               .
             </p>
           </div>
@@ -186,23 +257,37 @@ export function DocumentosTab({
       ) : (
         <div className="min-h-0 flex-1">
           <DocumentList
-            cedula={cedula}
-            radicado={radicado}
             docs={docs}
+            onUpload={openModal}
             onDelete={handleDelete}
             onUpdateStatus={handleUpdateStatus}
-            onUpload={openModal}
+            onSign={setFirmarDoc}
           />
         </div>
       )}
 
-      {modalOpen && (
+      {modalOpen && radicado && (
         <UploadDocumentModal
-          cedula={cedula}
+          radicado={radicado}
           onClose={closeModal}
-          onUploaded={refresh}
+          onUploaded={handleUploaded}
         />
       )}
+
+      {firmarDoc && (
+        <SignDocumentModal
+          doc={firmarDoc}
+          inicial={{
+            nombre: solicitante ?? "",
+            email: email ?? "",
+            celular: celular ?? "",
+          }}
+          onClose={() => setFirmarDoc(null)}
+          onSubmit={handleSign}
+        />
+      )}
+
+      {busy && <BusyOverlay message={busy} />}
     </div>
   );
 }

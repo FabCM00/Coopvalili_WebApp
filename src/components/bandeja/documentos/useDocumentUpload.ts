@@ -2,24 +2,26 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { API, MAX_SIZE_MB, VALID_FILE_TYPES } from "./utils";
 
-export type UploadStatus = "idle" | "uploading" | "done" | "error";
+type UploadStatus = "idle" | "uploading" | "done" | "error";
 
 export interface UseDocumentUpload {
   file: File | null;
   progress: number;
   status: UploadStatus;
   error: string | null;
-  start: (file: File, category: string) => void;
-  reset: () => void;
+  start: (file: File, tipoDocumento: string) => void;
 }
 
 /**
  * Encapsula la subida de un documento vía XMLHttpRequest (necesario para el
  * progreso real, que `fetch` no expone), incluyendo validación de tipo/tamaño
  * y el manejo de estados. Aborta cualquier subida en curso al desmontar.
+ *
+ * La cédula no se envía: el servidor la deriva del radicado, que es la fuente
+ * de verdad (ver guardarDocumento en @/lib/documentos).
  */
 export function useDocumentUpload(
-  cedula: string,
+  radicado: string,
   onUploaded: () => void,
 ): UseDocumentUpload {
   const [file, setFile] = useState<File | null>(null);
@@ -33,7 +35,7 @@ export function useDocumentUpload(
   }, []);
 
   const start = useCallback(
-    (selected: File, category: string) => {
+    (selected: File, tipoDocumento: string) => {
       setError(null);
 
       if (!VALID_FILE_TYPES.includes(selected.type)) {
@@ -53,11 +55,12 @@ export function useDocumentUpload(
 
       const form = new FormData();
       form.append("file", selected);
-      form.append("category", category);
+      form.append("radicado", radicado);
+      form.append("tipo_documento", tipoDocumento);
 
       const xhr = new XMLHttpRequest();
       xhrRef.current = xhr;
-      xhr.open("POST", `${API}?cedula=${encodeURIComponent(cedula)}`);
+      xhr.open("POST", `${API}/guardar`);
 
       xhr.upload.onprogress = (ev) => {
         if (ev.lengthComputable) {
@@ -86,16 +89,8 @@ export function useDocumentUpload(
       };
       xhr.send(form);
     },
-    [cedula, onUploaded],
+    [radicado, onUploaded],
   );
 
-  const reset = useCallback(() => {
-    xhrRef.current?.abort();
-    setFile(null);
-    setProgress(0);
-    setStatus("idle");
-    setError(null);
-  }, []);
-
-  return { file, progress, status, error, start, reset };
+  return { file, progress, status, error, start };
 }

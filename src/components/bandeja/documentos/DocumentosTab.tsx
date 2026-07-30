@@ -60,24 +60,17 @@ export function DocumentosTab({
   const closeModal = useCallback(() => setModalOpen(false), []);
 
   const handleSign = useCallback(
-    async (
-      doc: Documento,
-      firmante: Firmante,
-      canales: { email: boolean; whatsapp: boolean },
-    ) => {
+    async (doc: Documento, firmante: Firmante) => {
       // El error se propaga para que el modal lo muestre en línea y el usuario
       // pueda corregir los datos sin perder lo que escribió.
-      await enviarAFirma(doc, firmante, canales);
+      await enviarAFirma(doc, firmante);
       setFirmarDoc(null);
-      const via = [canales.email && "correo", canales.whatsapp && "WhatsApp"]
-        .filter(Boolean)
-        .join(" y ");
       notify({
         type: "success",
         message: (
           <>
             Documento enviado a firma. Se notificó a{" "}
-            <span className="font-semibold">{firmante.nombre}</span> por {via}.
+            <span className="font-semibold">{firmante.nombre}</span> por correo.
           </>
         ),
       });

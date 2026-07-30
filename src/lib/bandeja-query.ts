@@ -1,17 +1,12 @@
 import { Prisma } from "@prisma/client";
 import { buildResumen } from "@/lib/bandeja-mappers";
+import { SOLICITUD_ESTADOS } from "@/lib/bandeja-estados";
 import type { SolicitudEstado, SolicitudResumen } from "@/lib/types";
 
-const SOLICITUD_ESTADOS = [
-  "valida_1",
-  "no_valida_1",
-  "val_identidad",
-  "no_val_identidad",
-  "fallo_servicios",
-  "no_viable",
-  "aprobado",
-  "revision",
-] as const satisfies readonly SolicitudEstado[];
+// La lista canónica vive en bandeja-estados.ts, junto a las reglas que la
+// producen. Se reexporta desde aquí porque este módulo ya era el punto de
+// entrada para el resto del código.
+export { SOLICITUD_ESTADOS, isSolicitudEstado } from "@/lib/bandeja-estados";
 
 export const BANDEJA_INCLUDE = {
   motor_process_results: true,
@@ -28,10 +23,6 @@ export interface BandejaFilters {
   cedulaFilter?: string;
   q?: string;
   gestionado?: boolean;
-}
-
-export function isSolicitudEstado(value: string | null): value is SolicitudEstado {
-  return SOLICITUD_ESTADOS.some((estado) => estado === value);
 }
 
 export function buildBandejaWhere({

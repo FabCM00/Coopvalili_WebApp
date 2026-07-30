@@ -6,6 +6,7 @@
 //
 //  #  Estado              Regla
 //  ─  ──────────────────  ───────────────────────────────────────────────────────
+//  0  (override manual)   estado_manual != null  → gana sobre todo lo demás
 //  1  valida_1            valida1 === 1            && NO existe identity
 //  2  no_valida_1         valida1 !== 1            && NO existe identity
 //  3  val_identidad       status_face ∈ {1,success} && ( (tipo_validacion===1 &&
@@ -26,8 +27,55 @@
 //   existe motor_data      -> hay fila en motor_data_results (radicado != null)
 //   motor_process.status   -> motor_process_results.response_json.status
 //   instanciaAprobacion    -> motor_process_results.response_json.processing.instanciaAprobacion
+//   estado_manual          -> valida1_results.estado_manual (columna, no JSON)
 
 import type { SolicitudEstado } from "@/lib/types";
+
+/**
+ * Lista canónica de estados. Vive aquí, junto a las reglas que los producen,
+ * para que no haya dos fuentes que puedan divergir: `bandeja-query.ts` la
+ * reexporta. El `satisfies` hace que TypeScript avise si se añade un estado al
+ * tipo `SolicitudEstado` y se olvida aquí.
+ */
+export const SOLICITUD_ESTADOS = [
+  "valida_1",
+  "no_valida_1",
+  "val_identidad",
+  "no_val_identidad",
+  "fallo_servicios",
+  "no_viable",
+  "aprobado",
+  "revision",
+] as const satisfies readonly SolicitudEstado[];
+
+export function isSolicitudEstado(value: string | null): value is SolicitudEstado {
+  return (SOLICITUD_ESTADOS as readonly string[]).includes(value ?? "");
+}
+
+/**
+ * Estados que, una vez fijados a mano, no admiten más cambios desde la app.
+ * `aprobado` implica desembolso: revertirlo por la UI sería una vía silenciosa
+ * para deshacer un crédito ya autorizado. Vive aquí (y no en solicitud-estado.ts,
+ * que importa Prisma) para que el cliente pueda pintar el bloqueo sin duplicar
+ * la lista; quien manda es el servidor, que igual responde 409.
+ */
+const ESTADOS_TERMINALES: readonly SolicitudEstado[] = ["aprobado"];
+
+export function esEstadoTerminal(estado: SolicitudEstado): boolean {
+  return ESTADOS_TERMINALES.includes(estado);
+}
+
+/**
+ * Normaliza el override que viene de BD. La columna es `String?` (texto libre a
+ * ojos de Postgres), así que un valor viejo o escrito a mano podría no ser un
+ * estado válido; en ese caso se ignora y la solicitud vuelve al estado derivado
+ * en vez de romper los `Record<SolicitudEstado, …>` de la UI.
+ */
+export function parseEstadoManual(
+  v: string | null | undefined,
+): SolicitudEstado | null {
+  return isSolicitudEstado(v ?? null) ? (v as SolicitudEstado) : null;
+}
 
 /** Valores "ok": numérico 1 o texto "success"/"1". */
 function isSuccess(v: unknown): boolean {
@@ -60,6 +108,11 @@ export interface EstadoInputs {
   motorStatus: string | null;
   /** motor_process_results.response_json.processing.instanciaAprobacion */
   motorInstancia: number | null;
+  /**
+   * Override manual puesto por un colaborador (valida1_results.estado_manual).
+   * Si viene, gana sobre las 7 reglas. `null` = usar el estado derivado.
+   */
+  estadoManual?: SolicitudEstado | null;
 }
 
 /**
@@ -68,6 +121,12 @@ export interface EstadoInputs {
  * datos aún están incompletos o ninguna regla aplica.
  */
 export function deriveEstado(i: EstadoInputs): SolicitudEstado {
+  // ── Regla 0 — override manual ──
+  // Gana sobre todo. No sustituye a las reglas: las cortocircuita. Si el
+  // override se borra (NULL), el estado vuelve solo a lo que digan los datos,
+  // por eso abajo no hace falta ninguna limpieza.
+  if (i.estadoManual) return i.estadoManual;
+
   // ── Etapa Validación 1 (aún sin validación de identidad) ──
   if (!i.identityExists) {
     // Regla 1 / 2

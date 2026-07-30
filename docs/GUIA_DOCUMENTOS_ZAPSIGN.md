@@ -399,7 +399,7 @@ ZapSign se propaga recortado para que el usuario vea la causa real.
     phone_country: "57", phone_number, blank_phone: !celular,
     send_automatic_email: canales.email,
     send_automatic_whatsapp: canales.whatsapp,
-    auth_mode: "assinaturaTela-tokenEmail",
+    auth_mode: "assinaturaTela",
   }],
 }
 ```
@@ -409,6 +409,13 @@ pública que darle. Y ojo: ZapSign rechaza el prefijo `data:application/pdf;base
 
 **`external_id` con tu clave de negocio** es lo que hace el flujo rastreable
 después.
+
+**`auth_mode` sin `-tokenEmail`:** ese sufijo obliga al firmante a copiar un
+código que ZapSign le envía al correo. Aquí se quitó porque la identidad ya se
+validó antes en el flujo (`identity_validations`), así que el código era un
+segundo paso redundante que solo añadía fricción. Los modos se combinan con
+guion (`assinaturaTela-tokenEmail`), de modo que reactivarlo es volver a
+concatenarlo.
 
 ### Costos de `auth_mode`
 

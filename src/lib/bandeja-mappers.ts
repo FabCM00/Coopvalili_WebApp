@@ -8,7 +8,7 @@ import type {
   SolicitudUI,
   ValidacionItem,
 } from "@/lib/types";
-import { deriveEstado } from "@/lib/bandeja-estados";
+import { deriveEstado, parseEstadoManual } from "@/lib/bandeja-estados";
 
 function asObj(v: unknown): Record<string, any> | null {
   if (v === null || v === undefined) return null;
@@ -310,6 +310,7 @@ function resumenFrom(row: any, m: Mapped): SolicitudResumen {
     normalizeFecha(m.v1.created_at) ||
     normalizeFecha(m.md?.fecha_ingreso) ||
     normalizeFecha(m.v1.fecha_generacion);
+  const estadoManual = parseEstadoManual(row.estado_manual);
   return {
     radicado: m.v1.radicado,
     cedula: m.v1.cedula,
@@ -327,7 +328,12 @@ function resumenFrom(row: any, m: Mapped): SolicitudResumen {
       motorProcessExists: m.mp !== null,
       motorStatus: m.mp?.status ?? null,
       motorInstancia: m.mp?.instancia_aprobacion ?? null,
+      // Columna, no JSON: es el único input que no sale de los payloads.
+      estadoManual,
     }),
+    estadoEsManual: estadoManual !== null,
+    estadoManualPor: estadoManual ? (row.estado_manual_by ?? null) : null,
+    estadoManualAt: estadoManual && row.estado_manual_at ? toIso(row.estado_manual_at) : null,
     score: extractScore(m.md),
     decisionTexto: decisionTexto(m.mp, m.v1),
     sinMotor: !m.mp,

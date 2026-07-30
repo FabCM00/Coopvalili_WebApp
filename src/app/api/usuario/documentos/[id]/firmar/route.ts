@@ -7,7 +7,6 @@ import { enviarDocumentoAFirma } from "@/lib/zapsign";
 
 interface Body {
   firmante?: { nombre?: string; email?: string | null; celular?: string | null };
-  canales?: { email?: boolean; whatsapp?: boolean };
 }
 
 export async function POST(
@@ -58,10 +57,10 @@ export async function POST(
         email: body.firmante?.email ?? null,
         celular: body.firmante?.celular ?? null,
       },
-      canales: {
-        email: body.canales?.email ?? true,
-        whatsapp: body.canales?.whatsapp ?? false,
-      },
+      // El correo es el único canal: WhatsApp consumía créditos de ZapSign y se
+      // retiró de la UI. `enviarDocumentoAFirma` sigue soportando ambos, pero no
+      // se expone por API para que no se active sin querer desde un cliente.
+      canales: { email: true, whatsapp: false },
       enviadoPor: session.user.email ?? null,
     });
     return NextResponse.json({ ok: true, ...result }, { status: 201 });

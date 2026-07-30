@@ -1,4 +1,3 @@
-
 import { prisma } from "@/lib/prisma";
 import { withPrismaRetry } from "@/lib/prisma-retry";
 import {
@@ -154,10 +153,7 @@ export async function enviarDocumentoAFirma(
   );
   if (!fila) throw new DocumentoError("Documento no encontrado.", 404);
   if (fila.estado === "pendiente_firma") {
-    throw new DocumentoError(
-      "El documento ya está en proceso de firma.",
-      409,
-    );
+    throw new DocumentoError("El documento ya está en proceso de firma.", 409);
   }
   if (fila.estado === "firmado") {
     throw new DocumentoError("El documento ya fue firmado.", 409);
@@ -180,7 +176,11 @@ export async function enviarDocumentoAFirma(
         blank_phone: !celular,
         send_automatic_email: canales.email,
         send_automatic_whatsapp: canales.whatsapp,
-        auth_mode: "assinaturaTela-tokenEmail",
+        // Solo firma dibujada en pantalla, sin código de verificación: el
+        // añadido `-tokenEmail` obligaba al firmante a copiar un código que
+        // ZapSign le mandaba al correo. La identidad ya se validó antes en el
+        // flujo (identity_validations), así que ese segundo paso sobraba.
+        auth_mode: "assinaturaTela",
       },
     ],
   });
@@ -242,7 +242,11 @@ export interface ZapSignWebhookPayload {
 }
 
 export type WebhookOutcome =
-  | { handled: true; action: "firmado" | "rechazado" | "sin_cambio"; detail: string }
+  | {
+    handled: true;
+    action: "firmado" | "rechazado" | "sin_cambio";
+    detail: string;
+  }
   | { handled: false; detail: string };
 
 /** Eventos que ZapSign usa para "el documento quedó firmado". */
@@ -299,7 +303,8 @@ export async function procesarWebhook(
   }
 
   const esFirmado =
-    SIGNED_EVENTS.has(evento) || (payload.status ?? "").toLowerCase() === "signed";
+    SIGNED_EVENTS.has(evento) ||
+    (payload.status ?? "").toLowerCase() === "signed";
   if (!esFirmado) {
     return {
       handled: true,
@@ -335,7 +340,11 @@ export async function procesarWebhook(
   }
   const buffer = Buffer.from(await res.arrayBuffer());
 
-  await reemplazarContenido(firma.documento_id.toString(), buffer, "application/pdf");
+  await reemplazarContenido(
+    firma.documento_id.toString(),
+    buffer,
+    "application/pdf",
+  );
 
   await withPrismaRetry(() =>
     prisma.firma_solicitudes.update({

@@ -80,6 +80,17 @@ model valida1_results {
   updated_at            DateTime               @default(now()) @db.Timestamptz(6)
   gestionado_at         DateTime?              @db.Timestamptz(6)
   gestionado_by         String?
+
+  /// Override manual del estado. El estado normalmente se DERIVA de los payloads
+  /// del motor (ver bandeja-estados.ts); cuando este campo tiene valor, gana
+  /// sobre las 7 reglas. Se guarda quién y cuándo porque el cambio lo hace una
+  /// persona y un estado como `aprobado` implica desembolso: sin traza no hay
+  /// forma de auditar quién lo movió. Ponerlo en NULL devuelve la solicitud al
+  /// estado derivado, sin perder nada.
+  estado_manual         String?
+  estado_manual_at      DateTime?              @db.Timestamptz(6)
+  estado_manual_by      String?
+
   credito_decisiones    credito_decisiones?
   document_results      document_results[]
   documentos            documentos[]

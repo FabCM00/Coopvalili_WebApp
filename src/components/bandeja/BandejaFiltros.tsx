@@ -15,7 +15,7 @@ export const FILTROS: { id: FiltroTab; label: string; regla?: string }[] = [
   { id: "no_val_identidad", label: "No Val Identidad", regla: "Falló la validación de rostro o documento." },
   { id: "fallo_servicios", label: "Fallo Servicios", regla: "El motor respondió con error de servicio." },
   { id: "no_viable", label: "No viable", regla: "El motor decidió: no viable." },
-  { id: "aprobado", label: "Aprobado", regla: "El motor decidió: aprobado." },
+  { id: "aprobado", label: "Preaprobado", regla: "El motor decidió: preaprobado." },
   { id: "revision", label: "Revisión", regla: "No aplicó ninguna regla anterior; pendiente de revisión." },
 ];
 

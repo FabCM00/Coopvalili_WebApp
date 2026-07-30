@@ -1,7 +1,7 @@
 "use client";
 
 import { type SolicitudUI } from "@/lib/types";
-import { type DetailModalTab } from "./ModalHeader";
+import { type CambioEstadoControl, type DetailModalTab } from "./ModalHeader";
 import { ModalHeader } from "./ModalHeader";
 import { MotorJsonView, ResumenSolicitud } from "./DetailContent";
 import { DocumentosTab } from "./documentos/DocumentosTab";
@@ -10,14 +10,19 @@ import { LoadingScreen } from "../LoadingScreen";
 interface RequestDetailProps {
   solicitud: SolicitudUI | null;
   activeTab: DetailModalTab;
-  onGestionar?: () => void;
+  /** Ausente = no se ofrece cambiar el estado. */
+  cambioEstado?: CambioEstadoControl;
 }
 
 function isDetail(s: SolicitudUI): s is Exclude<SolicitudUI, { raw: null }> {
   return s.raw != null;
 }
 
-export function RequestDetail({ solicitud, activeTab }: RequestDetailProps) {
+export function RequestDetail({
+  solicitud,
+  activeTab,
+  cambioEstado,
+}: RequestDetailProps) {
   if (!solicitud) return null;
   const detail = isDetail(solicitud) ? solicitud : null;
 
@@ -41,7 +46,9 @@ export function RequestDetail({ solicitud, activeTab }: RequestDetailProps) {
           />
         ) : detail ? (
           <>
-            {activeTab === "campos" && <ResumenSolicitud solicitud={detail} />}
+            {activeTab === "campos" && (
+              <ResumenSolicitud solicitud={detail} cambioEstado={cambioEstado} />
+            )}
             {activeTab === "motor_json" && <MotorJsonView solicitud={detail} />}
           </>
         ) : (

@@ -25,7 +25,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { SolicitanteHeader } from "./ModalHeader";
+import { SolicitanteHeader, type CambioEstadoControl } from "./ModalHeader";
 
 function fmt(v: string | number | null | undefined): string {
   if (v === null || v === undefined || v === "") return "—";
@@ -232,7 +232,13 @@ function normBool(v: string | number | null | undefined): 1 | 2 | null {
   return null;
 }
 
-export function ResumenSolicitud({ solicitud }: { solicitud: SolicitudUI }) {
+export function ResumenSolicitud({
+  solicitud,
+  cambioEstado,
+}: {
+  solicitud: SolicitudUI;
+  cambioEstado?: CambioEstadoControl;
+}) {
   const v1 = solicitud.raw.valida1;
   const mp = solicitud.raw.motor_process;
   const md = solicitud.raw.motor_data;
@@ -241,7 +247,7 @@ export function ResumenSolicitud({ solicitud }: { solicitud: SolicitudUI }) {
 
   return (
     <div className="p-4 flex flex-col gap-5">
-      <SolicitanteHeader solicitud={solicitud} />
+      <SolicitanteHeader solicitud={solicitud} cambioEstado={cambioEstado} />
       <GridSection
         title="Solicitante"
         tooltip="Para más información revisa la pestaña de Datos JSON."

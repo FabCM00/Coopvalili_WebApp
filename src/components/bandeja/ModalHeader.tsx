@@ -62,7 +62,8 @@ export function ModalHeader({
  * Ausente = no se ofrece cambiar el estado; se pinta solo el badge.
  */
 export interface CambioEstadoControl {
-  onCambiar: (estado: SolicitudEstado | null) => void;
+  /** Resuelve cuando el cambio se guardó; rechaza si el servidor lo negó. */
+  onCambiar: (estado: SolicitudEstado | null) => Promise<void>;
   guardando: boolean;
   /** Estado terminal: el control se pinta con candado. */
   bloqueado: boolean;

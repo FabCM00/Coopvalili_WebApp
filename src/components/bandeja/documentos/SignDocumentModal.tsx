@@ -4,20 +4,17 @@ import { AlertCircle, FileSignature, Mail, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import type { FirmanteContacto } from "@/lib/firmante-solicitud";
 import { FileThumb, displayName, type Documento } from "./utils";
 
-export interface Firmante {
-  nombre: string;
-  email: string;
-  celular: string;
-}
+export type Firmante = FirmanteContacto;
 
 interface SignDocumentModalProps {
   doc: Documento;
   /** Datos del asociado para prellenar (editables antes de enviar). */
-  inicial: Firmante;
+  inicial: FirmanteContacto;
   onClose: () => void;
-  onSubmit: (doc: Documento, firmante: Firmante) => Promise<void>;
+  onSubmit: (doc: Documento, firmante: FirmanteContacto) => Promise<void>;
 }
 
 export function SignDocumentModal({
@@ -31,6 +28,12 @@ export function SignDocumentModal({
   const [celular, setCelular] = useState(inicial.celular);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setNombre(inicial.nombre);
+    setEmail(inicial.email);
+    setCelular(inicial.celular);
+  }, [inicial.nombre, inicial.email, inicial.celular]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {

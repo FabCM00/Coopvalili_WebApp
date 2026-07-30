@@ -1,12 +1,11 @@
 "use client";
 
 // Cambio manual del estado de una solicitud. El estado normalmente lo derivan
-// las reglas de bandeja-estados.ts; este control es la excepción, pensada sobre
-// todo para marcar `aprobado` cuando el asociado ya firmó el pagaré — un hecho
-// que ocurre fuera del motor.
+// las reglas de bandeja-estados.ts; este control es la excepción, pensada para
+// marcar `preaprobado` o `aprobado` cuando el colaborador confirma el avance.
 
-import { useEffect, useState } from "react";
-import { Check, Lock, MoreVertical, RotateCcw, TriangleAlert } from "lucide-react";
+import { useState } from "react";
+import { Lock, MoreVertical, RotateCcw, TriangleAlert } from "lucide-react";
 
 import {
   DropdownMenu,
@@ -25,9 +24,6 @@ import {
   esEstadoTerminal,
   type SolicitudEstado,
 } from "@/lib/bandeja";
-
-/** Cuánto queda el mensaje de éxito antes de volver al badge. */
-const MS_CONFIRMACION = 4000;
 
 interface EstadoSelectorProps {
   estado: SolicitudEstado;
@@ -49,54 +45,29 @@ export function EstadoSelector({
   guardando,
   onCambiar,
 }: EstadoSelectorProps) {
-  // Confirmación explícita para los terminales: una vez guardados no hay vuelta
+  // Confirmación explícita solo para `aprobado`: una vez guardado no hay vuelta
   // atrás desde la app, así que un clic accidental no debe bastar.
   const [confirmando, setConfirmando] = useState<SolicitudEstado | null>(null);
-  // Mensaje de éxito tras guardar; se cierra solo (ver efecto abajo).
-  const [confirmado, setConfirmado] = useState<SolicitudEstado | null>(null);
-
-  useEffect(() => {
-    if (!confirmado) return;
-    const t = setTimeout(() => setConfirmado(null), MS_CONFIRMACION);
-    return () => clearTimeout(t);
-  }, [confirmado]);
 
   // El error de guardado lo reporta el llamador (banner de la bandeja); aquí
-  // solo se captura para que la promesa rechazada no quede suelta y para no
-  // anunciar un éxito que no ocurrió.
+  // solo se captura para que la promesa rechazada no quede suelta.
   const guardar = async (siguiente: SolicitudEstado | null) => {
     try {
       await onCambiar(siguiente);
-      // Al revertir no hay nada que celebrar: vuelve al badge automático.
-      if (siguiente) setConfirmado(siguiente);
     } catch {
       // Silencio deliberado: ver comentario arriba.
     } finally {
-      // Se limpia pase lo que pase: antes, un fallo dejaba el panel de
-      // confirmación abierto para siempre.
       setConfirmando(null);
     }
   };
 
   if (confirmando) {
     return (
-      <ConfirmarTerminal
-        estado={confirmando}
+      <ConfirmarAprobado
         guardando={guardando}
         onCancelar={() => setConfirmando(null)}
         onConfirmar={() => void guardar(confirmando)}
       />
-    );
-  }
-
-  if (confirmado) {
-    return (
-      <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-        <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden />
-        <p className="text-[11px] font-medium text-emerald-800">
-          Marcada como {ESTADO_LABEL[confirmado]}
-        </p>
-      </div>
     );
   }
 
@@ -127,7 +98,6 @@ export function EstadoSelector({
               Cambiar estado
             </DropdownMenuLabel>
 
-            {/* Solo los asignables a mano: el resto los derivan las reglas. */}
             {ESTADOS_ASIGNABLES.map((e) => (
               <DropdownMenuCheckboxItem
                 key={e}
@@ -152,7 +122,6 @@ export function EstadoSelector({
               </DropdownMenuCheckboxItem>
             ))}
 
-            {/* Solo tiene sentido revertir si hay algo que revertir. */}
             {esManual && (
               <>
                 <DropdownMenuSeparator />
@@ -193,19 +162,17 @@ function EstadoBadge({
   );
 }
 
-interface ConfirmarTerminalProps {
-  estado: SolicitudEstado;
+interface ConfirmarAprobadoProps {
   guardando: boolean;
   onCancelar: () => void;
   onConfirmar: () => void;
 }
 
-function ConfirmarTerminal({
-  estado,
+function ConfirmarAprobado({
   guardando,
   onCancelar,
   onConfirmar,
-}: ConfirmarTerminalProps) {
+}: ConfirmarAprobadoProps) {
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5">
       <div className="flex items-start gap-2">
@@ -214,8 +181,8 @@ function ConfirmarTerminal({
           aria-hidden
         />
         <p className="text-[11px] leading-snug text-amber-900">
-          Vas a marcar la solicitud como <strong>{ESTADO_LABEL[estado]}</strong>.
-          Este estado es definitivo y no se puede cambiar después.
+          ¿Deseas marcar la solicitud como <strong>Aprobado</strong>? Este estado
+          es definitivo y no se puede cambiar después.
         </p>
       </div>
       <div className="flex justify-end gap-2">

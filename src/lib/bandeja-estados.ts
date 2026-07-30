@@ -16,7 +16,7 @@
 //                         && NO existe motor_data
 //  5  fallo_servicios     motor_process.status !== "ok"
 //  6  no_viable           motor_process.instanciaAprobacion === 2
-//  7  aprobado            motor_process.instanciaAprobacion === 1
+//  7  preaprobado         motor_process.instanciaAprobacion === 1
 //  ·  revision            (fallback) ninguna regla anterior aplicó / datos incompletos
 //
 // Mapeo a la BD real (payloads JSON):
@@ -44,6 +44,7 @@ export const SOLICITUD_ESTADOS = [
   "no_val_identidad",
   "fallo_servicios",
   "no_viable",
+  "preaprobado",
   "aprobado",
   "revision",
 ] as const satisfies readonly SolicitudEstado[];
@@ -56,12 +57,13 @@ export function isSolicitudEstado(value: string | null): value is SolicitudEstad
  * Estados que un colaborador puede asignar a mano. Es un subconjunto pequeño a
  * propósito: los demás los derivan las reglas a partir de los payloads del
  * motor, y ofrecerlos en la UI invitaría a contradecir datos que el sistema ya
- * conoce. Estos dos dependen de algo que solo sabe el colaborador — sobre todo
- * `aprobado`, que se marca cuando el asociado ya firmó el pagaré.
+ * conoce. Solo `preaprobado` y `aprobado`: el primero cuando el motor ya
+ * preaprobó pero hace falta marcarlo a mano; el segundo cuando el asociado
+ * ya firmó el pagaré.
  */
 export const ESTADOS_ASIGNABLES = [
+  "preaprobado",
   "aprobado",
-  "no_viable",
 ] as const satisfies readonly SolicitudEstado[];
 
 export function esEstadoAsignable(estado: SolicitudEstado): boolean {
@@ -175,7 +177,7 @@ export function deriveEstado(i: EstadoInputs): SolicitudEstado {
   // Regla 6
   if (i.motorInstancia === 2) return "no_viable";
   // Regla 7
-  if (i.motorInstancia === 1) return "aprobado";
+  if (i.motorInstancia === 1) return "preaprobado";
 
   // Motor respondió ok pero la instancia de aprobación es indeterminada.
   return "revision";

@@ -8,6 +8,7 @@ export type SolicitudEstado =
   | "no_val_identidad"
   | "fallo_servicios"
   | "no_viable"
+  | "preaprobado"
   | "aprobado"
   | "revision";
 

@@ -2,14 +2,15 @@
 
 import Image from "next/image";
 import { AlertCircle } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { useNotification } from "@/contexts/NotificationContext";
 import { Button } from "@/components/ui/button";
 import { BusyOverlay } from "@/components/BusyOverlay";
+import type { FirmanteContacto } from "@/lib/firmante-solicitud";
 import { DocumentList } from "./DocumentList";
-import { SignDocumentModal, type Firmante } from "./SignDocumentModal";
+import { SignDocumentModal } from "./SignDocumentModal";
 import { UploadDocumentModal } from "./UploadDocumentModal";
 import { useDocumentos } from "./useDocumentos";
 import {
@@ -21,22 +22,18 @@ import {
 
 interface DocumentosTabProps {
   cedula: string;
-  solicitante?: string;
   /** Los documentos se listan por radicado: sin él no hay nada que mostrar. */
   radicado?: string;
   /** Contacto del asociado: prellena el modal de firma (editable). */
-  email?: string | null;
-  celular?: string | null;
+  firmante: FirmanteContacto;
   /** En el modal expandido el encabezado lo pinta ModalHeader; aquí se omite. */
   showHeader?: boolean;
 }
 
 export function DocumentosTab({
   cedula,
-  solicitante,
   radicado,
-  email,
-  celular,
+  firmante,
   showHeader = true,
 }: DocumentosTabProps) {
   const {
@@ -56,21 +53,31 @@ export function DocumentosTab({
   /** Mensaje del velo de trabajo; null = ninguna acción en curso. */
   const [busy, setBusy] = useState<string | null>(null);
 
+  const firmanteInicial = useMemo(
+    () => ({
+      nombre: firmante.nombre,
+      email: firmante.email,
+      celular: firmante.celular,
+    }),
+    [firmante.nombre, firmante.email, firmante.celular],
+  );
+
   const openModal = useCallback(() => setModalOpen(true), []);
   const closeModal = useCallback(() => setModalOpen(false), []);
 
   const handleSign = useCallback(
-    async (doc: Documento, firmante: Firmante) => {
+    async (doc: Documento, datosFirmante: FirmanteContacto) => {
       // El error se propaga para que el modal lo muestre en línea y el usuario
       // pueda corregir los datos sin perder lo que escribió.
-      await enviarAFirma(doc, firmante);
+      await enviarAFirma(doc, datosFirmante);
       setFirmarDoc(null);
       notify({
         type: "success",
         message: (
           <>
             Documento enviado a firma. Se notificó a{" "}
-            <span className="font-semibold">{firmante.nombre}</span> por correo.
+            <span className="font-semibold">{datosFirmante.nombre}</span> por
+            correo.
           </>
         ),
       });
@@ -143,8 +150,6 @@ export function DocumentosTab({
     [updateStatus, notify],
   );
 
-  // El modal de carga se cierra al terminar la subida; el velo cubre el refresco
-  // de la lista para que no se vea el salto entre "subido" y "aparece en la lista".
   const handleUploaded = useCallback(async () => {
     setBusy("Guardando documento");
     try {
@@ -160,10 +165,10 @@ export function DocumentosTab({
         Bandeja de documentos
       </h3>
       <p className="mt-0.5 truncate text-xs text-[#0D0D0D]/55">
-        {solicitante ? (
-          <span className="font-medium text-[#0D0D0D]/70">{solicitante}</span>
+        {firmante.nombre ? (
+          <span className="font-medium text-[#0D0D0D]/70">{firmante.nombre}</span>
         ) : null}
-        {solicitante ? " · " : null}CC {cedula}
+        {firmante.nombre ? " · " : null}CC {cedula}
       </p>
     </div>
   ) : null;
@@ -201,7 +206,6 @@ export function DocumentosTab({
   }
 
   return (
-    // `relative` ancla el BusyOverlay a la pestaña (no a la ventana).
     <div className="relative flex h-full flex-col bg-white">
       {header}
 
@@ -269,12 +273,9 @@ export function DocumentosTab({
 
       {firmarDoc && (
         <SignDocumentModal
+          key={firmarDoc.id}
           doc={firmarDoc}
-          inicial={{
-            nombre: solicitante ?? "",
-            email: email ?? "",
-            celular: celular ?? "",
-          }}
+          inicial={firmanteInicial}
           onClose={() => setFirmarDoc(null)}
           onSubmit={handleSign}
         />

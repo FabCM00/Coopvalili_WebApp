@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import type { FirmanteContacto } from "@/lib/firmante-solicitud";
 import { API, type DocStatus, type Documento } from "./utils";
 
 /**
@@ -18,10 +19,7 @@ export interface UseDocumentos {
   refresh: () => Promise<void>;
   remove: (doc: Documento) => Promise<void>;
   updateStatus: (doc: Documento, estado: DocStatus) => Promise<void>;
-  enviarAFirma: (
-    doc: Documento,
-    firmante: { nombre: string; email: string; celular: string },
-  ) => Promise<void>;
+  enviarAFirma: (doc: Documento, firmante: FirmanteContacto) => Promise<void>;
 }
 
 /**
@@ -157,10 +155,7 @@ export function useDocumentos(radicado: string | undefined): UseDocumentos {
   // Envía a firma y recarga: el documento queda en `pendiente_firma` y su fila
   // pasa a mostrarse bloqueada (sin acciones manuales).
   const enviarAFirma = useCallback(
-    async (
-      doc: Documento,
-      firmante: { nombre: string; email: string; celular: string },
-    ) => {
+    async (doc: Documento, firmante: FirmanteContacto) => {
       const res = await fetch(
         `${API}/${encodeURIComponent(doc.id)}/firmar?radicado=${encodeURIComponent(doc.radicado)}`,
         {

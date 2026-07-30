@@ -610,7 +610,7 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
                     cambiarEstadoMutation.mutateAsync(estado).then(() => undefined),
                   guardando: cambiarEstadoMutation.isPending,
                   // Solo bloquea si el terminal lo puso una persona: si el motor
-                  // dejó `aprobado` por su cuenta, aún debe poder corregirse.
+                  // dejó `preaprobado` por su cuenta, aún debe poder corregirse.
                   bloqueado:
                     selectedDetail.estadoEsManual &&
                     esEstadoTerminal(selectedDetail.estado),

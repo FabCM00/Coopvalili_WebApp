@@ -46,7 +46,10 @@ function mapValida1(row: any) {
   const res = asObj(row.response_json);
   const req = asObj(row.request_json);
   const result = asObj(res?.result) ?? {};
-  const da = asObj(res?.datos_asociado) ?? {};
+  // El contacto puede venir en la respuesta o solo en la petición original.
+  const daRes = asObj(res?.datos_asociado) ?? {};
+  const daReq = asObj(req?.datos_asociado) ?? {};
+  const da = { ...daReq, ...daRes };
   return {
     radicado: row.radicado,
     cedula: row.cedula ?? str(da.numero_identificacion) ?? "",

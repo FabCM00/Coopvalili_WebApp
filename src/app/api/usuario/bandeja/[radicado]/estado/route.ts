@@ -8,15 +8,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { auth } from "../../../../../../../auth";
-import { SOLICITUD_ESTADOS } from "@/lib/bandeja-estados";
+import { ESTADOS_ASIGNABLES } from "@/lib/bandeja-estados";
 import {
   SolicitudEstadoError,
   cambiarEstadoSolicitud,
 } from "@/lib/solicitud-estado";
 
+// Solo los estados asignables a mano; el resto los derivan las reglas del motor.
 // `estado: null` es explícito y significa "quitar el override".
 const bodySchema = z.object({
-  estado: z.enum(SOLICITUD_ESTADOS).nullable(),
+  estado: z.enum(ESTADOS_ASIGNABLES).nullable(),
 });
 
 export async function PATCH(

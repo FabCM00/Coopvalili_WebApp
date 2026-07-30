@@ -11,8 +11,8 @@
 import { prisma } from "@/lib/prisma";
 import { withPrismaRetry } from "@/lib/prisma-retry";
 import {
+  esEstadoAsignable,
   esEstadoTerminal,
-  isSolicitudEstado,
   parseEstadoManual,
 } from "@/lib/bandeja-estados";
 import type { SolicitudEstado } from "@/lib/types";
@@ -57,9 +57,12 @@ export async function cambiarEstadoSolicitud(
   if (!radicado) {
     throw new SolicitudEstadoError("Radicado requerido.", 400);
   }
-  if (input.estado !== null && !isSolicitudEstado(input.estado)) {
+  // No basta con que sea un estado válido: solo un subconjunto se puede fijar a
+  // mano. Los demás los derivan las reglas del motor y aceptarlos aquí dejaría
+  // contradecir por API datos que el sistema ya calculó.
+  if (input.estado !== null && !esEstadoAsignable(input.estado)) {
     throw new SolicitudEstadoError(
-      `El estado "${input.estado}" no es válido.`,
+      `El estado "${input.estado}" no se puede asignar manualmente.`,
       400,
     );
   }

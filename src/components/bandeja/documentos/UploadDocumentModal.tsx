@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useNotification } from "@/contexts/NotificationContext";
 import {
-  DEFAULT_CATEGORY,
+  DEFAULT_TIPO,
   FileThumb,
   MAX_SIZE_MB,
   formatFileSize,
@@ -15,19 +15,19 @@ import {
 import { useDocumentUpload } from "./useDocumentUpload";
 
 interface UploadDocumentModalProps {
-  cedula: string;
+  radicado: string;
   onClose: () => void;
   onUploaded: () => void;
 }
 
 export function UploadDocumentModal({
-  cedula,
+  radicado,
   onClose,
   onUploaded,
 }: UploadDocumentModalProps) {
   const { notify } = useNotification();
   const { file, progress, status, error, start } = useDocumentUpload(
-    cedula,
+    radicado,
     onUploaded,
   );
   const [dragOver, setDragOver] = useState(false);
@@ -36,7 +36,7 @@ export function UploadDocumentModal({
 
   // Tipo de documento que titula la carpeta. Si se deja vacío usamos la carpeta
   // por defecto, así la carga nunca queda bloqueada.
-  const effectiveCategory = docType.trim() || DEFAULT_CATEGORY;
+  const effectiveCategory = docType.trim() || DEFAULT_TIPO;
 
   const isEmpty = status === "idle" || status === "error";
   const uploading = status === "uploading";
@@ -125,7 +125,7 @@ export function UploadDocumentModal({
                   className="w-full rounded-lg border border-[#0D0D0D]/12 px-3 py-2 text-sm text-[#0D0D0D]/80 outline-none transition-colors placeholder:text-[#0D0D0D]/35 focus:border-[#012340]/40"
                 />
                 <p className="mt-1.5 text-xs text-[#0D0D0D]/40">
-                  Opcional. Si lo dejas vacío se guarda en «{DEFAULT_CATEGORY}».
+                  Opcional. Si lo dejas vacío se guarda en «{DEFAULT_TIPO}».
                 </p>
               </div>
 

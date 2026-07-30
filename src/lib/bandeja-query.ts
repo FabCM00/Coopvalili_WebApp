@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { buildResumen } from "@/lib/bandeja-mappers";
 import type { SolicitudEstado, SolicitudResumen } from "@/lib/types";
 
-export const SOLICITUD_ESTADOS = [
+const SOLICITUD_ESTADOS = [
   "valida_1",
   "no_valida_1",
   "val_identidad",

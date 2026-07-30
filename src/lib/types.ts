@@ -72,16 +72,12 @@ export interface MotorProcessResultRow {
   created_at: string;
   request_json: Json;
   response_json: Json;
-  // Escenarios B1/B2/B3 — opcionales: no vienen en el payload actual del motor.
-  monto_credito_b1?: number | null;
-  monto_credito_b2?: number | null;
-  monto_credito_b3?: number | null;
-  cuota_b1?: number | null;
-  cuota_b2?: number | null;
-  cuota_b3?: number | null;
-  cumple_4_criterios_b1?: string | number | null;
-  cumple_4_criterios_b2?: string | number | null;
-  cumple_4_criterios_b3?: string | number | null;
+  // Oferta — solo relevante cuando instancia_aprobacion === 1.
+  // `monto_oferta` y `tasa_periodica` llegan ya formateados del motor.
+  periodos: number | null;
+  tasa_periodica: string | null;
+  cuota_periodica: number | null;
+  monto_oferta: string | null;
 }
 
 export interface MotorDataResultRow {

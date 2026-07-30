@@ -108,8 +108,6 @@ const TAB_LABELS: Record<DetailModalTab, string> = {
   documentos: "Documentos",
 };
 
-export const TAB_LABELS_EXPORT = TAB_LABELS;
-
 interface ModalTabsProps {
   active: DetailModalTab;
   onChange: (tab: DetailModalTab) => void;

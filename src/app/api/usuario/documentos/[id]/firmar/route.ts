@@ -1,0 +1,79 @@
+
+import { NextRequest, NextResponse } from "next/server";
+
+import { auth } from "../../../../../../../auth";
+import { DocumentoError } from "@/lib/documentos";
+import { enviarDocumentoAFirma } from "@/lib/zapsign";
+
+interface Body {
+  firmante?: { nombre?: string; email?: string | null; celular?: string | null };
+  canales?: { email?: boolean; whatsapp?: boolean };
+}
+
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json(
+      { ok: false, message: "No autorizado." },
+      { status: 401 },
+    );
+  }
+
+  const { id } = await params;
+  const radicado = req.nextUrl.searchParams.get("radicado") ?? "";
+  if (!radicado) {
+    return NextResponse.json(
+      { ok: false, message: "Parámetro 'radicado' requerido." },
+      { status: 400 },
+    );
+  }
+
+  let body: Body;
+  try {
+    body = (await req.json()) as Body;
+  } catch {
+    return NextResponse.json(
+      { ok: false, message: "Cuerpo inválido." },
+      { status: 400 },
+    );
+  }
+
+  const nombre = body.firmante?.nombre?.trim();
+  if (!nombre) {
+    return NextResponse.json(
+      { ok: false, message: "El nombre del firmante es obligatorio." },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const result = await enviarDocumentoAFirma({
+      documentoId: id,
+      radicado,
+      firmante: {
+        nombre,
+        email: body.firmante?.email ?? null,
+        celular: body.firmante?.celular ?? null,
+      },
+      canales: {
+        email: body.canales?.email ?? true,
+        whatsapp: body.canales?.whatsapp ?? false,
+      },
+      enviadoPor: session.user.email ?? null,
+    });
+    return NextResponse.json({ ok: true, ...result }, { status: 201 });
+  } catch (error: unknown) {
+    if (error instanceof DocumentoError) {
+      return NextResponse.json(
+        { ok: false, message: error.message },
+        { status: error.status },
+      );
+    }
+    console.error("[documentos/firmar]", error);
+    const msg = error instanceof Error ? error.message : "Error interno.";
+    return NextResponse.json({ ok: false, message: msg }, { status: 500 });
+  }
+}

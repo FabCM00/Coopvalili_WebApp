@@ -130,6 +130,13 @@ function mapMotorProcess(row: any | null) {
     cumplimiento_4_criterios: num(p.cumpl4Criterios),
     viable_cmd: num(p.viableCmd),
     instancia_aprobacion: num(p.instanciaAprobacion),
+    // Oferta — el motor ya entrega el monto formateado en `montoDefinitivo`
+    // ("$3.500.000"), así que va como texto y la UI lo muestra tal cual (sin
+    // `currency`). Igual `tasaPer` ("0.45%"). `cuotaPeriodica` sí es numérico.
+    periodos: num(p.periodos),
+    tasa_periodica: str(p.tasaPer),
+    cuota_periodica: num(p.cuotaPeriodica),
+    monto_oferta: str(p.montoDefinitivo),
     created_at: toIso(row.created_at),
     request_json: req,
     response_json: res,

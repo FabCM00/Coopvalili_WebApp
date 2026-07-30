@@ -132,13 +132,3 @@ export const ESTADO_BADGE: Record<SolicitudEstado, string> = {
   revision: "bg-amber-50 text-amber-700 border-amber-200",
 };
 
-export const ESTADO_BORDER: Record<SolicitudEstado, string> = {
-  valida_1: "border-l-teal-500",
-  no_valida_1: "border-l-pink-500",
-  val_identidad: "border-l-indigo-500",
-  no_val_identidad: "border-l-yellow-600",
-  fallo_servicios: "border-l-red-600",
-  no_viable: "border-l-orange-500",
-  aprobado: "border-l-emerald-500",
-  revision: "border-l-amber-400",
-};

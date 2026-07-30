@@ -21,6 +21,9 @@ export type {
   CreditoDecisionRow,
 } from "@/lib/types";
 
+// Seguro en cliente: bandeja-estados.ts solo importa tipos (sin Prisma).
+export { SOLICITUD_ESTADOS, esEstadoTerminal } from "@/lib/bandeja-estados";
+
 type Ok<T> = { ok: true; data: T };
 type Err = { ok: false; error: { message: string } };
 export type Result<T> = Ok<T> | Err;
@@ -97,6 +100,21 @@ export const bandeja = {
       body: JSON.stringify({ radicado, email }),
     });
   },
+
+  /** `estado: null` quita el override y devuelve la solicitud al estado derivado. */
+  cambiarEstado(
+    radicado: string,
+    estado: SolicitudEstado | null,
+  ): Promise<Result<{ radicado: string; estadoManual: SolicitudEstado | null }>> {
+    return request<{ radicado: string; estadoManual: SolicitudEstado | null }>(
+      `${PREFIX}/api/usuario/bandeja/${encodeURIComponent(radicado)}/estado`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estado }),
+      },
+    );
+  },
 };
 
 export const ESTADO_LABEL: Record<SolicitudEstado, string> = {
@@ -106,7 +124,7 @@ export const ESTADO_LABEL: Record<SolicitudEstado, string> = {
   no_val_identidad: "No val. identidad",
   fallo_servicios: "Fallo en servicios",
   no_viable: "No viable",
-  aprobado: "Aprobado",
+  aprobado: "Preaprobado",
   revision: "Revisión",
 };
 
@@ -117,7 +135,7 @@ export const ESTADO_DOT: Record<SolicitudEstado, string> = {
   no_val_identidad: "bg-yellow-600",
   fallo_servicios: "bg-red-600",
   no_viable: "bg-orange-500",
-  aprobado: "bg-emerald-500",
+  aprobado: "bg-violet-500",
   revision: "bg-amber-500",
 };
 
@@ -128,7 +146,7 @@ export const ESTADO_BADGE: Record<SolicitudEstado, string> = {
   no_val_identidad: "bg-yellow-50 text-yellow-800 border-yellow-300",
   fallo_servicios: "bg-red-50 text-red-700 border-red-200",
   no_viable: "bg-orange-50 text-orange-700 border-orange-200",
-  aprobado: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  aprobado: "bg-violet-50 text-violet-700 border-violet-200",
   revision: "bg-amber-50 text-amber-700 border-amber-200",
 };
 

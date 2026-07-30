@@ -8,6 +8,8 @@ import {
   ESTADO_LABEL,
   ESTADO_DOT,
   ESTADO_BADGE,
+  esEstadoTerminal,
+  type SolicitudEstado,
   type SolicitudesPage,
 } from "@/lib/bandeja";
 import { useAuth } from "@/contexts/AuthContext";
@@ -49,6 +51,49 @@ const PAGE_SIZE = 20;
 const SKELETON_ROWS = Array.from({ length: 8 }, (_, i) => i);
 const COP_FORMATTER = new Intl.NumberFormat("es-CO");
 
+/** Filas fantasma con la misma métrica que una fila real, para que la lista no
+ *  salte de alto al llegar los datos. */
+function ListaSkeleton() {
+  return (
+    <div className="flex flex-col">
+      {SKELETON_ROWS.map((i) => (
+        <div
+          key={i}
+          className="px-4 py-3 border-b border-[#0D0D0D]/5 animate-pulse"
+        >
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-1.5">
+              <div className="h-1.5 w-1.5 rounded-full bg-[#0D0D0D]/12 flex-shrink-0" />
+              <div
+                className="h-3 bg-[#0D0D0D]/8 rounded"
+                style={{ width: 120 }}
+              />
+            </div>
+            <div
+              className="h-2.5 bg-[#0D0D0D]/8 rounded"
+              style={{ width: 36 }}
+            />
+          </div>
+          <div
+            className="h-2 bg-[#0D0D0D]/6 rounded ml-3 mb-1.5"
+            style={{ width: 100 }}
+          />
+          <div className="flex items-center justify-between ml-3">
+            <div
+              className="h-2.5 bg-[#0D0D0D]/6 rounded"
+              style={{ width: 90 }}
+            />
+            <div
+              className="h-2.5 bg-[#0D0D0D]/6 rounded"
+              style={{ width: 48 }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -72,7 +117,14 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
     error: queryError,
     refetch,
   } = useQuery({
-    queryKey: ["solicitudes", cedulaFilter, page, vistaGestionados, query, filtro] as const,
+    queryKey: [
+      "solicitudes",
+      cedulaFilter,
+      page,
+      vistaGestionados,
+      query,
+      filtro,
+    ] as const,
     queryFn: async () => {
       const r = await bandeja.listSolicitudes({
         limit: PAGE_SIZE,
@@ -103,7 +155,12 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
     error: conteoError,
     refetch: refetchConteo,
   } = useQuery({
-    queryKey: ["solicitudes-conteo", cedulaFilter, vistaGestionados, query] as const,
+    queryKey: [
+      "solicitudes-conteo",
+      cedulaFilter,
+      vistaGestionados,
+      query,
+    ] as const,
     queryFn: async () => {
       const r = await bandeja.getConteoPorEstado({
         cedulaFilter,
@@ -121,8 +178,12 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
   const totalPages = result?.totalPages ?? 1;
   const totalActivas = result?.totalActivas ?? 0;
   const totalGestionadas = result?.totalGestionadas ?? 0;
-  // Cambio de pestaña Activas ↔ Gestionadas: velo a pantalla completa, porque
-  // cambia toda la lista y no solo un filtro dentro de ella.
+  // Cambio de pestaña Activas ↔ Gestionadas: hay que detectarlo aparte porque
+  // `placeholderData` conserva la lista anterior, así que `loading` es false y
+  // sin esto la vista seguiría pintando las filas de la otra pestaña hasta que
+  // llegue el fetch. Se compara contra `vistaKey` (la pestaña que produjo los
+  // datos en mano) y no contra `refreshing` solo, que también se activa en el
+  // refetch periódico de 30s — ahí sí queremos conservar la lista.
   const isVistaChange = Boolean(
     refreshing && result && result.vistaKey !== vistaGestionados,
   );
@@ -131,10 +192,10 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
   );
   const isPageChange = Boolean(
     !isVistaChange &&
-      refreshing &&
-      result &&
-      result.filtroKey === filtro &&
-      result.pageKey !== page,
+    refreshing &&
+    result &&
+    result.filtroKey === filtro &&
+    result.pageKey !== page,
   );
 
   const { data: selectedDetail = null, isLoading: detailLoading } = useQuery({
@@ -149,7 +210,10 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
 
   const gestionarMutation = useMutation({
     mutationFn: async (radicado: string) => {
-      const r = await bandeja.marcarGestionado(radicado, user?.email ?? undefined);
+      const r = await bandeja.marcarGestionado(
+        radicado,
+        user?.email ?? undefined,
+      );
       if (!r.ok) throw new Error(r.error.message);
       return r;
     },
@@ -168,6 +232,24 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
       setMutationError(`Error al gestionar: ${e.message}`);
       setConfirmRadicado(null);
     },
+  });
+
+  const cambiarEstadoMutation = useMutation({
+    mutationFn: async (estado: SolicitudEstado | null) => {
+      const r = await bandeja.cambiarEstado(selectedRadicado!, estado);
+      if (!r.ok) throw new Error(r.error.message);
+      return r.data;
+    },
+    onSuccess: async () => {
+      // El estado cambia la fila y el conteo, y el detalle abierto muestra el
+      // badge: hay que refrescar los tres o la UI queda desfasada.
+      await Promise.all([
+        qc.refetchQueries({ queryKey: ["solicitudes"] }),
+        qc.refetchQueries({ queryKey: ["solicitudes-conteo"] }),
+        qc.refetchQueries({ queryKey: ["solicitud", selectedRadicado] }),
+      ]);
+    },
+    onError: (e: Error) => setMutationError(`Error al cambiar estado: ${e.message}`),
   });
 
   const error =
@@ -192,16 +274,25 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
   };
 
   const conteoPorEstado = useMemo(
-    () => new Map<FiltroTab, number>(Object.entries(conteoResult ?? {}) as [FiltroTab, number][]),
+    () =>
+      new Map<FiltroTab, number>(
+        Object.entries(conteoResult ?? {}) as [FiltroTab, number][],
+      ),
     [conteoResult],
   );
   const pageRows = solicitudes;
 
   const pageStart = (page - 1) * PAGE_SIZE;
 
-  useEffect(() => { setPage(1); }, [filtro, rawQuery, vistaGestionados]);
-  useEffect(() => { setSelectedRadicado(null); }, [vistaGestionados]);
-  useEffect(() => { setSelectedRadicado(null); }, [page]);
+  useEffect(() => {
+    setPage(1);
+  }, [filtro, rawQuery, vistaGestionados]);
+  useEffect(() => {
+    setSelectedRadicado(null);
+  }, [vistaGestionados]);
+  useEffect(() => {
+    setSelectedRadicado(null);
+  }, [page]);
 
   const seleccionada = useMemo(
     () => solicitudes.find((s) => s.radicado === selectedRadicado) ?? null,
@@ -210,11 +301,29 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
 
   const handleExportCSV = () => {
     if (pageRows.length === 0) return;
-    const headers = ["identificacion", "fecha", "radicado", "solicitante", "valor", "estado", "score_cifin", "gestionado"];
+    const headers = [
+      "identificacion",
+      "fecha",
+      "radicado",
+      "solicitante",
+      "valor",
+      "estado",
+      "score_cifin",
+      "gestionado",
+    ];
     const csv = [
       headers.join(","),
       ...pageRows.map((s) =>
-        [s.cedula, s.fecha, s.radicado, `"${s.solicitante.replace(/"/g, '""')}"`, s.valor, ESTADO_LABEL[s.estado], s.score ?? "", s.gestionado ? (s.gestionadoAt ?? "sí") : "no"].join(","),
+        [
+          s.cedula,
+          s.fecha,
+          s.radicado,
+          `"${s.solicitante.replace(/"/g, '""')}"`,
+          s.valor,
+          ESTADO_LABEL[s.estado],
+          s.score ?? "",
+          s.gestionado ? (s.gestionadoAt ?? "sí") : "no",
+        ].join(","),
       ),
     ].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -227,13 +336,15 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
   };
 
   const confirmSolicitud = useMemo(
-    () => (confirmRadicado ? solicitudes.find((s) => s.radicado === confirmRadicado) ?? null : null),
+    () =>
+      confirmRadicado
+        ? (solicitudes.find((s) => s.radicado === confirmRadicado) ?? null)
+        : null,
     [confirmRadicado, solicitudes],
   );
 
   return (
     <div className="flex flex-col -m-4 sm:-m-6 lg:-m-8 h-[calc(100%+2rem)] sm:h-[calc(100%+3rem)] lg:h-[calc(100%+4rem)]">
-
       {/* ── Top bar ── */}
       <div className="flex items-center justify-between gap-4 px-4 sm:px-6 py-3 border-b border-[#0D0D0D]/10 bg-white flex-shrink-0">
         <div>
@@ -241,7 +352,9 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
             {mode === "admin" ? "Bandeja de solicitudes" : "Mis solicitudes"}
           </h2>
           <p className="text-[11px] text-[#0D0D0D]/40">
-            {loading ? "Cargando…" : `${total} solicitudes · p. ${page}/${totalPages}`}
+            {loading
+              ? "Cargando…"
+              : `${total} solicitudes · p. ${page}/${totalPages}`}
           </p>
         </div>
         <DropdownMenu>
@@ -267,7 +380,10 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
               disabled={refreshing}
               className="text-[11px] font-semibold cursor-pointer"
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} /> Actualizar
+              <RefreshCw
+                className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`}
+              />{" "}
+              Actualizar
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={handleExportCSV}
@@ -295,7 +411,9 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
               className={`flex-1 py-2.5 text-[11px] font-semibold tracking-wide transition-all ${!vistaGestionados ? "bg-[#012340] text-white" : "text-[#0D0D0D]/50 hover:text-[#0D0D0D]/80"}`}
             >
               Activas{" "}
-              <span className={`ml-1 text-[10px] font-bold ${!vistaGestionados ? "opacity-70" : "opacity-40"}`}>
+              <span
+                className={`ml-1 text-[10px] font-bold ${!vistaGestionados ? "opacity-70" : "opacity-40"}`}
+              >
                 {totalActivas}
               </span>
             </button>
@@ -305,7 +423,9 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
               className={`flex-1 py-2.5 text-[11px] font-semibold tracking-wide transition-all ${vistaGestionados ? "bg-[#012340] text-white" : "text-[#0D0D0D]/50 hover:text-[#0D0D0D]/80"}`}
             >
               Gestionadas{" "}
-              <span className={`ml-1 text-[10px] font-bold ${vistaGestionados ? "opacity-70" : "opacity-40"}`}>
+              <span
+                className={`ml-1 text-[10px] font-bold ${vistaGestionados ? "opacity-70" : "opacity-40"}`}
+              >
                 {totalGestionadas}
               </span>
             </button>
@@ -317,7 +437,11 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
             className="p-1.5 text-[#0D0D0D]/40 hover:text-[#012340] hover:bg-[#0D0D0D]/5 rounded-md transition-colors flex-shrink-0"
             title={showList ? "Ocultar lista" : "Mostrar lista"}
           >
-            {showList ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
+            {showList ? (
+              <PanelLeftClose className="h-4 w-4" />
+            ) : (
+              <PanelLeft className="h-4 w-4" />
+            )}
           </button>
           {seleccionada && (
             <ModalTabs active={activeTab} onChange={setActiveTab} />
@@ -327,7 +451,6 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
 
       {/* ── Two-panel body ── */}
       <div className="flex flex-1 min-h-0 overflow-hidden bg-white">
-
         {/* Filtros empotrados */}
         {showList && (
           <BandejaFiltros
@@ -358,10 +481,11 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
                 <button
                   onClick={() => setFiltroOpen((o) => !o)}
                   title="Filtros"
-                  className={`relative h-8 w-8 flex-shrink-0 inline-flex items-center justify-center border transition-colors ${filtroOpen || filtrosActivos > 0
-                    ? "border-[#012340] bg-[#012340] text-white"
-                    : "border-[#0D0D0D]/12 text-[#0D0D0D]/55 hover:border-[#012340]/40 hover:text-[#012340]"
-                    }`}
+                  className={`relative h-8 w-8 flex-shrink-0 inline-flex items-center justify-center border transition-colors ${
+                    filtroOpen || filtrosActivos > 0
+                      ? "border-[#012340] bg-[#012340] text-white"
+                      : "border-[#0D0D0D]/12 text-[#0D0D0D]/55 hover:border-[#012340]/40 hover:text-[#012340]"
+                  }`}
                 >
                   <SlidersHorizontal className="h-3.5 w-3.5" />
                   {filtrosActivos > 0 && (
@@ -383,7 +507,10 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
                       <X className="h-2.5 w-2.5" />
                     </button>
                   </span>
-                  <button onClick={handleLimpiarFiltros} className="text-[10px] font-semibold text-[#0D0D0D]/45 hover:text-[#012340] transition-colors">
+                  <button
+                    onClick={handleLimpiarFiltros}
+                    className="text-[10px] font-semibold text-[#0D0D0D]/45 hover:text-[#012340] transition-colors"
+                  >
                     Limpiar
                   </button>
                 </div>
@@ -393,30 +520,17 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
             <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
               {isFilterChange ? (
                 <LoadingScreen message="Aplicando filtro…" fullScreen={false} />
-              ) : loading || isPageChange ? (
-                <div className="flex flex-col">
-                  {SKELETON_ROWS.map((i) => (
-                    <div key={i} className="px-4 py-3 border-b border-[#0D0D0D]/5 animate-pulse">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div className="flex items-center gap-1.5">
-                          <div className="h-1.5 w-1.5 rounded-full bg-[#0D0D0D]/12 flex-shrink-0" />
-                          <div className="h-3 bg-[#0D0D0D]/8 rounded" style={{ width: 120 }} />
-                        </div>
-                        <div className="h-2.5 bg-[#0D0D0D]/8 rounded" style={{ width: 36 }} />
-                      </div>
-                      <div className="h-2 bg-[#0D0D0D]/6 rounded ml-3 mb-1.5" style={{ width: 100 }} />
-                      <div className="flex items-center justify-between ml-3">
-                        <div className="h-2.5 bg-[#0D0D0D]/6 rounded" style={{ width: 90 }} />
-                        <div className="h-2.5 bg-[#0D0D0D]/6 rounded" style={{ width: 48 }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              ) : loading || isVistaChange || isPageChange ? (
+                <ListaSkeleton />
               ) : pageRows.length === 0 ? (
                 <div className="py-16 px-4 text-center flex flex-col items-center gap-3">
                   <Inbox className="h-6 w-6 text-[#0D0D0D]/20" />
-                  <p className="text-sm font-semibold text-[#0D0D0D]/50">Sin resultados</p>
-                  <p className="text-[11px] text-[#0D0D0D]/35">Intenta con otro filtro o búsqueda</p>
+                  <p className="text-sm font-semibold text-[#0D0D0D]/50">
+                    Sin resultados
+                  </p>
+                  <p className="text-[11px] text-[#0D0D0D]/35">
+                    Intenta con otro filtro o búsqueda
+                  </p>
                 </div>
               ) : (
                 pageRows.map((s) => {
@@ -424,16 +538,23 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
                   return (
                     <button
                       key={s.radicado}
-                      onClick={() => setSelectedRadicado(selected ? null : s.radicado)}
-                      className={`w-full text-left px-4 py-3 border-b border-[#0D0D0D]/5 transition-colors border-l-2 ${selected
-                        ? "bg-[#012340]/[0.05] border-l-[#012340]"
-                        : "border-l-transparent hover:bg-[#0D0D0D]/[0.02]"
-                        }`}
+                      onClick={() =>
+                        setSelectedRadicado(selected ? null : s.radicado)
+                      }
+                      className={`w-full text-left px-4 py-3 border-b border-[#0D0D0D]/5 transition-colors border-l-2 ${
+                        selected
+                          ? "bg-[#012340]/[0.05] border-l-[#012340]"
+                          : "border-l-transparent hover:bg-[#0D0D0D]/[0.02]"
+                      }`}
                     >
                       <div className="flex items-center justify-between gap-2 mb-0.5">
                         <div className="flex items-center gap-1.5 min-w-0">
-                          <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${ESTADO_DOT[s.estado]}`} />
-                          <span className={`text-[13px] truncate ${!s.gestionado ? "font-semibold text-[#012340]" : "font-normal text-[#0D0D0D]/60"}`}>
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${ESTADO_DOT[s.estado]}`}
+                          />
+                          <span
+                            className={`text-[13px] truncate ${!s.gestionado ? "font-semibold text-[#012340]" : "font-normal text-[#0D0D0D]/60"}`}
+                          >
                             {s.solicitante}
                           </span>
                         </div>
@@ -448,7 +569,9 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
                         <span className="text-[11px] text-[#0D0D0D]/45 truncate">
                           CC {s.cedula} · {formatCurrency(s.valor)}
                         </span>
-                        <span className={`flex-shrink-0 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide border ${ESTADO_BADGE[s.estado]}`}>
+                        <span
+                          className={`flex-shrink-0 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide border ${ESTADO_BADGE[s.estado]}`}
+                        >
                           {ESTADO_LABEL[s.estado]}
                         </span>
                       </div>
@@ -480,7 +603,15 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
               <RequestDetail
                 solicitud={selectedDetail}
                 activeTab={activeTab}
-                onGestionar={mode === "admin" && !seleccionada.gestionado ? () => handleGestionar(seleccionada.radicado) : undefined}
+                cambioEstado={{
+                  onCambiar: (estado) => cambiarEstadoMutation.mutate(estado),
+                  guardando: cambiarEstadoMutation.isPending,
+                  // Solo bloquea si el terminal lo puso una persona: si el motor
+                  // dejó `aprobado` por su cuenta, aún debe poder corregirse.
+                  bloqueado:
+                    selectedDetail.estadoEsManual &&
+                    esEstadoTerminal(selectedDetail.estado),
+                }}
               />
             )
           ) : (
@@ -498,7 +629,8 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
                   Selecciona una solicitud
                 </p>
                 <p className="text-sm text-[#0D0D0D]/50 max-w-[360px] leading-relaxed">
-                  Elige una solicitud de la lista para ver su detalle, campos y documentos.
+                  Elige una solicitud de la lista para ver su detalle, campos y
+                  documentos.
                 </p>
               </div>
             </div>
@@ -509,7 +641,10 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
       {confirmRadicado && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-4 duration-200 animate-in fade-in"
-          onClick={(e) => { if (e.target === e.currentTarget && !gestionarMutation.isPending) setConfirmRadicado(null); }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !gestionarMutation.isPending)
+              setConfirmRadicado(null);
+          }}
         >
           <div className="w-full max-w-sm border border-l-4 border-[#0D0D0D]/15 border-l-[#012340] bg-white shadow-2xl duration-200 animate-in zoom-in-95">
             <div className="border-b border-[#0D0D0D]/10 px-5 py-4">
@@ -525,18 +660,46 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
                 <CheckCircle2 className="h-4 w-4 text-[#012340]" aria-hidden />
                 Confirmar acción
               </p>
-              <h3 className="mt-1.5 text-sm font-bold text-[#012340]">Marcar como Gestionado</h3>
+              <h3 className="mt-1.5 text-sm font-bold text-[#012340]">
+                Marcar como Gestionado
+              </h3>
             </div>
             <div className="px-5 py-4 space-y-3">
-              <p className="text-sm text-[#0D0D0D]/70">¿Confirmas que esta solicitud ya fue atendida?</p>
+              <p className="text-sm text-[#0D0D0D]/70">
+                ¿Confirmas que esta solicitud ya fue atendida?
+              </p>
               {confirmSolicitud && (
                 <div className="border border-[#0D0D0D]/10 bg-[#0D0D0D]/[0.02] p-3 space-y-1">
-                  <p className="text-xs"><span className="font-medium text-[#0D0D0D]/45">Solicitante:</span> <span className="text-[#0D0D0D]/80">{confirmSolicitud.solicitante}</span></p>
-                  <p className="text-xs"><span className="font-medium text-[#0D0D0D]/45">Cédula:</span> <span className="text-[#0D0D0D]/80">{confirmSolicitud.cedula}</span></p>
-                  <p className="text-xs"><span className="font-medium text-[#0D0D0D]/45">Radicado:</span> <span className="font-mono text-[#0D0D0D]/80">{confirmSolicitud.radicado}</span></p>
+                  <p className="text-xs">
+                    <span className="font-medium text-[#0D0D0D]/45">
+                      Solicitante:
+                    </span>{" "}
+                    <span className="text-[#0D0D0D]/80">
+                      {confirmSolicitud.solicitante}
+                    </span>
+                  </p>
+                  <p className="text-xs">
+                    <span className="font-medium text-[#0D0D0D]/45">
+                      Cédula:
+                    </span>{" "}
+                    <span className="text-[#0D0D0D]/80">
+                      {confirmSolicitud.cedula}
+                    </span>
+                  </p>
+                  <p className="text-xs">
+                    <span className="font-medium text-[#0D0D0D]/45">
+                      Radicado:
+                    </span>{" "}
+                    <span className="font-mono text-[#0D0D0D]/80">
+                      {confirmSolicitud.radicado}
+                    </span>
+                  </p>
                 </div>
               )}
-              <p className="text-xs text-[#0D0D0D]/40">La solicitud pasará a Gestionadas. Esta acción no se puede deshacer.</p>
+              <p className="text-xs text-[#0D0D0D]/40">
+                La solicitud pasará a Gestionadas. Esta acción no se puede
+                deshacer.
+              </p>
             </div>
             <div className="border-t border-[#0D0D0D]/10 px-5 py-3 flex justify-end gap-2">
               <Button
@@ -575,19 +738,23 @@ function formatCurrency(v: number): string {
 }
 
 function formatFechaCorta(iso: string): string {
-    if (!iso) return "—";
-    // Fecha sin hora: no pasa por conversión de zona horaria (un día calendario
-    // no tiene huso horario propio; convertirlo podría retroceder al día anterior).
-    const soloFecha = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (soloFecha) return `${soloFecha[3]}/${soloFecha[2]}/${soloFecha[1]}`;
+  if (!iso) return "—";
+  // Fecha sin hora: no pasa por conversión de zona horaria (un día calendario
+  // no tiene huso horario propio; convertirlo podría retroceder al día anterior).
+  const soloFecha = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (soloFecha) return `${soloFecha[3]}/${soloFecha[2]}/${soloFecha[1]}`;
 
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return iso;
-    const parts = new Intl.DateTimeFormat("en-CA", {
-        timeZone: "America/Bogota",
-        year: "numeric", month: "2-digit", day: "2-digit",
-        hour: "2-digit", minute: "2-digit", hour12: false,
-    }).formatToParts(d);
-    const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
-    return `${get("day")}/${get("month")}/${get("year")} ${get("hour")}:${get("minute")}`;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Bogota",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(d);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return `${get("day")}/${get("month")}/${get("year")} ${get("hour")}:${get("minute")}`;
 }

@@ -21,7 +21,6 @@ export interface UseDocumentos {
   enviarAFirma: (
     doc: Documento,
     firmante: { nombre: string; email: string; celular: string },
-    canales: { email: boolean; whatsapp: boolean },
   ) => Promise<void>;
 }
 
@@ -161,14 +160,17 @@ export function useDocumentos(radicado: string | undefined): UseDocumentos {
     async (
       doc: Documento,
       firmante: { nombre: string; email: string; celular: string },
-      canales: { email: boolean; whatsapp: boolean },
     ) => {
       const res = await fetch(
         `${API}/${encodeURIComponent(doc.id)}/firmar?radicado=${encodeURIComponent(doc.radicado)}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ firmante, canales }),
+          // El correo es el único canal: WhatsApp consumía créditos de ZapSign.
+          body: JSON.stringify({
+            firmante,
+            canales: { email: true, whatsapp: false },
+          }),
         },
       );
       const json = (await res.json()) as { ok?: boolean; message?: string };

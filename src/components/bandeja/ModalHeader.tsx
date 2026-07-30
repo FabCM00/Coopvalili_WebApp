@@ -1,11 +1,14 @@
 "use client";
 
 import {
+  type SolicitudEstado,
   type SolicitudUI,
   ESTADO_LABEL,
   ESTADO_BADGE,
 } from "@/lib/bandeja";
 import { X } from "lucide-react";
+
+import { EstadoSelector } from "./EstadoSelector";
 
 export type DetailModalTab = "campos" | "motor_json" | "documentos";
 
@@ -36,8 +39,8 @@ export function ModalHeader({
         </button>
       )}
 
-      {/* El estado "Gestionada" se muestra junto al badge de estado
-          en SolicitanteHeader, no aquí. */}
+      {/* El estado (y su selector) se muestran en SolicitanteHeader, donde ya
+          vive el badge — pintarlo aquí también lo duplicaría. */}
 
       {onClose && (
         <button
@@ -52,7 +55,28 @@ export function ModalHeader({
   );
 }
 
-export function SolicitanteHeader({ solicitud }: { solicitud: SolicitudUI }) {
+/**
+ * Control del selector de estado. Va agrupado en un objeto porque atraviesa dos
+ * niveles de componentes (RequestDetail → ResumenSolicitud → SolicitanteHeader)
+ * y como props sueltos serían tres parámetros repetidos en cada salto.
+ * Ausente = no se ofrece cambiar el estado; se pinta solo el badge.
+ */
+export interface CambioEstadoControl {
+  onCambiar: (estado: SolicitudEstado | null) => void;
+  guardando: boolean;
+  /** Estado terminal: el control se pinta con candado. */
+  bloqueado: boolean;
+}
+
+interface SolicitanteHeaderProps {
+  solicitud: SolicitudUI;
+  cambioEstado?: CambioEstadoControl;
+}
+
+export function SolicitanteHeader({
+  solicitud,
+  cambioEstado,
+}: SolicitanteHeaderProps) {
   const badge = ESTADO_BADGE[solicitud.estado];
   const badgeLabel = ESTADO_LABEL[solicitud.estado];
 
@@ -85,9 +109,20 @@ export function SolicitanteHeader({ solicitud }: { solicitud: SolicitudUI }) {
           Estado de la solicitud
         </p>
         <div className="flex items-center justify-end gap-1.5">
-          <span className={`text-[10px] font-bold px-2 py-0.5 border ${badge}`}>
-            {badgeLabel}
-          </span>
+          {cambioEstado ? (
+            <EstadoSelector
+              estado={solicitud.estado}
+              esManual={solicitud.estadoEsManual}
+              manualPor={solicitud.estadoManualPor}
+              bloqueado={cambioEstado.bloqueado}
+              guardando={cambioEstado.guardando}
+              onCambiar={cambioEstado.onCambiar}
+            />
+          ) : (
+            <span className={`text-[10px] font-bold px-2 py-0.5 border ${badge}`}>
+              {badgeLabel}
+            </span>
+          )}
           {solicitud.gestionado && (
             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 border border-emerald-200">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 flex-shrink-0" />

@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, FileSignature, Mail, MessageCircle, X } from "lucide-react";
+import { AlertCircle, FileSignature, Mail, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -17,11 +17,7 @@ interface SignDocumentModalProps {
   /** Datos del asociado para prellenar (editables antes de enviar). */
   inicial: Firmante;
   onClose: () => void;
-  onSubmit: (
-    doc: Documento,
-    firmante: Firmante,
-    canales: { email: boolean; whatsapp: boolean },
-  ) => Promise<void>;
+  onSubmit: (doc: Documento, firmante: Firmante) => Promise<void>;
 }
 
 export function SignDocumentModal({
@@ -33,9 +29,6 @@ export function SignDocumentModal({
   const [nombre, setNombre] = useState(inicial.nombre);
   const [email, setEmail] = useState(inicial.email);
   const [celular, setCelular] = useState(inicial.celular);
-  // WhatsApp arranca apagado: consume créditos comprados en ZapSign.
-  const [canalEmail, setCanalEmail] = useState(true);
-  const [canalWhatsapp, setCanalWhatsapp] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,21 +40,19 @@ export function SignDocumentModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose, enviando]);
 
-  const sinCanal = !canalEmail && !canalWhatsapp;
-  const faltaEmail = canalEmail && !email.trim();
-  const faltaCelular = canalWhatsapp && !celular.trim();
-  const puedeEnviar =
-    !!nombre.trim() && !sinCanal && !faltaEmail && !faltaCelular && !enviando;
+  // El correo es el único canal, así que sin él no hay envío posible.
+  const faltaEmail = !email.trim();
+  const puedeEnviar = !!nombre.trim() && !faltaEmail && !enviando;
 
   const handleSubmit = async () => {
     setError(null);
     setEnviando(true);
     try {
-      await onSubmit(
-        doc,
-        { nombre: nombre.trim(), email: email.trim(), celular: celular.trim() },
-        { email: canalEmail, whatsapp: canalWhatsapp },
-      );
+      await onSubmit(doc, {
+        nombre: nombre.trim(),
+        email: email.trim(),
+        celular: celular.trim(),
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo enviar a firma.");
       setEnviando(false);
@@ -135,8 +126,12 @@ export function SignDocumentModal({
               />
             </label>
 
+            {/* Ya no alimenta ningún canal de aviso, pero se sigue enviando a
+                ZapSign como dato de contacto del firmante. */}
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs text-[#0D0D0D]/50">Celular</span>
+              <span className="text-xs text-[#0D0D0D]/50">
+                Celular <span className="opacity-60">(opcional)</span>
+              </span>
               <input
                 type="tel"
                 value={celular}
@@ -147,56 +142,19 @@ export function SignDocumentModal({
             </label>
           </fieldset>
 
-          {/* Canales de aviso */}
-          <fieldset className="flex flex-col gap-2" disabled={enviando}>
-            <legend className="mb-1 text-xs font-medium text-[#0D0D0D]/55">
-              Notificar por
-            </legend>
+          {/* Canal de aviso: solo correo. */}
+          <div className="flex items-center gap-2.5 rounded-lg border border-[#0D0D0D]/10 bg-black/[0.02] px-3 py-2.5">
+            <Mail className="h-4 w-4 text-[#0D0D0D]/40" aria-hidden />
+            <span className="text-sm text-[#0D0D0D]/75">
+              Se notificará por correo electrónico
+            </span>
+          </div>
 
-            <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-[#0D0D0D]/10 px-3 py-2.5 transition-colors hover:border-[#012340]/25">
-              <input
-                type="checkbox"
-                checked={canalEmail}
-                onChange={(e) => setCanalEmail(e.target.checked)}
-                className="h-4 w-4 accent-[#012340]"
-              />
-              <Mail className="h-4 w-4 text-[#0D0D0D]/40" aria-hidden />
-              <span className="text-sm text-[#0D0D0D]/75">
-                Correo electrónico
-              </span>
-              <span className="ml-auto text-[10px] font-medium uppercase tracking-wide text-emerald-600">
-                Sin costo
-              </span>
-            </label>
-
-            <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-[#0D0D0D]/10 px-3 py-2.5 transition-colors hover:border-[#012340]/25">
-              <input
-                type="checkbox"
-                checked={canalWhatsapp}
-                onChange={(e) => setCanalWhatsapp(e.target.checked)}
-                className="h-4 w-4 accent-[#012340]"
-              />
-              <MessageCircle
-                className="h-4 w-4 text-[#0D0D0D]/40"
-                aria-hidden
-              />
-              <span className="text-sm text-[#0D0D0D]/75">WhatsApp</span>
-              <span className="ml-auto text-[10px] font-medium uppercase tracking-wide text-brand-orange">
-                Usa créditos
-              </span>
-            </label>
-          </fieldset>
-
-          {(sinCanal || faltaEmail || faltaCelular || error) && (
+          {(faltaEmail || error) && (
             <div className="flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
               <span>
-                {error ??
-                  (sinCanal
-                    ? "Elige al menos un canal para avisar al firmante."
-                    : faltaEmail
-                      ? "Para notificar por correo necesitas el correo del firmante."
-                      : "Para notificar por WhatsApp necesitas el celular del firmante.")}
+                {error ?? "Necesitas el correo del firmante para enviar a firma."}
               </span>
             </div>
           )}

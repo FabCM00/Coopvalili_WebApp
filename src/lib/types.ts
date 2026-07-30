@@ -130,6 +130,13 @@ export interface SolicitudResumen {
   fecha: string;
   valor: number;
   estado: SolicitudEstado;
+  /**
+   * `true` si `estado` viene de un override manual y no de las reglas. La UI lo
+   * usa para avisar que ese estado lo puso una persona.
+   */
+  estadoEsManual: boolean;
+  estadoManualPor: string | null;
+  estadoManualAt: string | null;
   score: number | null;
   decisionTexto: string;
   sinMotor: boolean;

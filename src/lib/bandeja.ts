@@ -22,7 +22,11 @@ export type {
 } from "@/lib/types";
 
 // Seguro en cliente: bandeja-estados.ts solo importa tipos (sin Prisma).
-export { SOLICITUD_ESTADOS, esEstadoTerminal } from "@/lib/bandeja-estados";
+export {
+  SOLICITUD_ESTADOS,
+  ESTADOS_ASIGNABLES,
+  esEstadoTerminal,
+} from "@/lib/bandeja-estados";
 
 type Ok<T> = { ok: true; data: T };
 type Err = { ok: false; error: { message: string } };

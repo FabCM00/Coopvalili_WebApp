@@ -53,6 +53,22 @@ export function isSolicitudEstado(value: string | null): value is SolicitudEstad
 }
 
 /**
+ * Estados que un colaborador puede asignar a mano. Es un subconjunto pequeño a
+ * propósito: los demás los derivan las reglas a partir de los payloads del
+ * motor, y ofrecerlos en la UI invitaría a contradecir datos que el sistema ya
+ * conoce. Estos dos dependen de algo que solo sabe el colaborador — sobre todo
+ * `aprobado`, que se marca cuando el asociado ya firmó el pagaré.
+ */
+export const ESTADOS_ASIGNABLES = [
+  "aprobado",
+  "no_viable",
+] as const satisfies readonly SolicitudEstado[];
+
+export function esEstadoAsignable(estado: SolicitudEstado): boolean {
+  return (ESTADOS_ASIGNABLES as readonly string[]).includes(estado);
+}
+
+/**
  * Estados que, una vez fijados a mano, no admiten más cambios desde la app.
  * `aprobado` implica desembolso: revertirlo por la UI sería una vía silenciosa
  * para deshacer un crédito ya autorizado. Vive aquí (y no en solicitud-estado.ts,

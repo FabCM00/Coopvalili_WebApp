@@ -604,7 +604,10 @@ export function BandejaView({ mode, cedulaFilter }: BandejaViewProps) {
                 solicitud={selectedDetail}
                 activeTab={activeTab}
                 cambioEstado={{
-                  onCambiar: (estado) => cambiarEstadoMutation.mutate(estado),
+                  // mutateAsync (y no mutate) para que el selector sepa si el
+                  // guardado funcionó antes de mostrar su mensaje de éxito.
+                  onCambiar: (estado) =>
+                    cambiarEstadoMutation.mutateAsync(estado).then(() => undefined),
                   guardando: cambiarEstadoMutation.isPending,
                   // Solo bloquea si el terminal lo puso una persona: si el motor
                   // dejó `aprobado` por su cuenta, aún debe poder corregirse.

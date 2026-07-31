@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { BusyOverlay } from "@/components/BusyOverlay";
 import type { FirmanteContacto } from "@/lib/firmante-solicitud";
 import { DocumentList } from "./DocumentList";
-import { SignDocumentModal } from "./SignDocumentModal";
+import { SignPreviewModal } from "./SignPreviewModal";
 import { UploadDocumentModal } from "./UploadDocumentModal";
 import { useDocumentos } from "./useDocumentos";
 import {
@@ -45,11 +45,12 @@ export function DocumentosTab({
     remove,
     updateStatus,
     enviarAFirma,
+    enviarLoteAFirma,
   } = useDocumentos(radicado);
   const { confirm, notify } = useNotification();
   const [modalOpen, setModalOpen] = useState(false);
-  /** Documento seleccionado para enviar a firma; null = modal cerrado. */
-  const [firmarDoc, setFirmarDoc] = useState<Documento | null>(null);
+  /** Documentos marcados para enviar a firma; null = modal cerrado. */
+  const [firmarDocs, setFirmarDocs] = useState<Documento[] | null>(null);
   /** Mensaje del velo de trabajo; null = ninguna acción en curso. */
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -66,23 +67,38 @@ export function DocumentosTab({
   const closeModal = useCallback(() => setModalOpen(false), []);
 
   const handleSign = useCallback(
-    async (doc: Documento, datosFirmante: FirmanteContacto) => {
+    async (datosFirmante: FirmanteContacto) => {
       // El error se propaga para que el modal lo muestre en línea y el usuario
       // pueda corregir los datos sin perder lo que escribió.
-      await enviarAFirma(doc, datosFirmante);
-      setFirmarDoc(null);
+      if (!firmarDocs || firmarDocs.length === 0) return;
+      const lote = firmarDocs.length > 1;
+      if (lote) {
+        await enviarLoteAFirma(firmarDocs, datosFirmante);
+      } else {
+        await enviarAFirma(firmarDocs[0], datosFirmante);
+      }
+      setFirmarDocs(null);
       notify({
         type: "success",
         message: (
           <>
-            Documento enviado a firma. Se notificó a{" "}
+            {lote ? (
+              <>
+                {firmarDocs.length} documentos enviados a firma en un solo
+                link. Se notificó a{" "}
+              </>
+            ) : (
+              <>
+                Documento enviado a firma. Se notificó a{" "}
+              </>
+            )}
             <span className="font-semibold">{datosFirmante.nombre}</span> por
             correo.
           </>
         ),
       });
     },
-    [enviarAFirma, notify],
+    [enviarAFirma, enviarLoteAFirma, firmarDocs, notify],
   );
 
   const handleDelete = useCallback(
@@ -258,7 +274,7 @@ export function DocumentosTab({
             onUpload={openModal}
             onDelete={handleDelete}
             onUpdateStatus={handleUpdateStatus}
-            onSign={setFirmarDoc}
+            onSignBatch={setFirmarDocs}
           />
         </div>
       )}
@@ -271,12 +287,12 @@ export function DocumentosTab({
         />
       )}
 
-      {firmarDoc && (
-        <SignDocumentModal
-          key={firmarDoc.id}
-          doc={firmarDoc}
+      {firmarDocs && firmarDocs.length > 0 && (
+        <SignPreviewModal
+          key={firmarDocs.map((d) => d.id).join(",")}
+          docs={firmarDocs}
           inicial={firmanteInicial}
-          onClose={() => setFirmarDoc(null)}
+          onClose={() => setFirmarDocs(null)}
           onSubmit={handleSign}
         />
       )}

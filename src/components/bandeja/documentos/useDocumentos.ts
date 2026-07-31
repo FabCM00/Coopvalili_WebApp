@@ -20,6 +20,11 @@ export interface UseDocumentos {
   remove: (doc: Documento) => Promise<void>;
   updateStatus: (doc: Documento, estado: DocStatus) => Promise<void>;
   enviarAFirma: (doc: Documento, firmante: FirmanteContacto) => Promise<void>;
+  /** Envía varios documentos en un solo sobre de ZapSign (1 link de firma). */
+  enviarLoteAFirma: (
+    docs: Documento[],
+    firmante: FirmanteContacto,
+  ) => Promise<void>;
 }
 
 /**
@@ -177,6 +182,32 @@ export function useDocumentos(radicado: string | undefined): UseDocumentos {
     [load],
   );
 
+  // Envío múltiple: el primer documento de la selección va como principal del
+  // sobre y el resto como anexos; el firmante recibe un solo link.
+  const enviarLoteAFirma = useCallback(
+    async (docs: Documento[], firmante: FirmanteContacto) => {
+      const ids = docs.map((d) => d.id);
+      const res = await fetch(
+        `${API}/firmar-lote?radicado=${encodeURIComponent(docs[0].radicado)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ids,
+            firmante,
+            canales: { email: true, whatsapp: false },
+          }),
+        },
+      );
+      const json = (await res.json()) as { ok?: boolean; message?: string };
+      if (!res.ok || !json.ok) {
+        throw new Error(json.message ?? "No se pudo enviar a firma.");
+      }
+      await load(true);
+    },
+    [load],
+  );
+
   return {
     docs,
     loading,
@@ -186,5 +217,6 @@ export function useDocumentos(radicado: string | undefined): UseDocumentos {
     remove,
     updateStatus,
     enviarAFirma,
+    enviarLoteAFirma,
   };
 }

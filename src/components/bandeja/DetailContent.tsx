@@ -26,6 +26,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { SolicitanteHeader, type CambioEstadoControl } from "./ModalHeader";
+import { LoadingScreen } from "@/components/LoadingScreen";
 
 function fmt(v: string | number | null | undefined): string {
   if (v === null || v === undefined || v === "") return "—";
@@ -532,11 +533,9 @@ function JsonView({ data }: JsonViewProps) {
             guides: { indentation: true, bracketPairs: true },
             renderWhitespace: "none",
           }}
-          loading={
-            <div className="p-4 text-xs text-slate-400 font-mono">
-              Cargando editor...
-            </div>
-          }
+          // Monaco llega por carga diferida y tarda: se usa el mismo velo con
+          // logo que el resto de la app en vez de un texto suelto.
+          loading={<LoadingScreen message="Cargando editor" fullScreen={false} />}
         />
       </div>
     </div>

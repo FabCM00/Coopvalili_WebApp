@@ -172,6 +172,26 @@ export function displayName(name: string): string {
 }
 
 /**
+ * Buena parte de los archivos que sube el chatbot se llaman con el hash del
+ * contenido (64 caracteres hexadecimales). Sin tratarlos aparte, ese ruido ocupa
+ * toda la fila y tapa lo único que identifica al documento: su carpeta.
+ *
+ * Se recortan por el medio —los extremos son lo que permite reconocerlos al
+ * compararlos con la BD— y se marcan como técnicos para bajarles el contraste.
+ */
+export function nombreLegible(name: string): {
+  texto: string;
+  tecnico: boolean;
+} {
+  const base = displayName(name);
+  if (!/^[0-9a-f]{24,}$/i.test(base)) return { texto: base, tecnico: false };
+  return {
+    texto: `${base.slice(0, 10)}…${base.slice(-6)}`,
+    tecnico: true,
+  };
+}
+
+/**
  * URL del endpoint que sirve el archivo. El `radicado` va como control de
  * acceso: la API verifica que el documento pertenezca a esa solicitud.
  */

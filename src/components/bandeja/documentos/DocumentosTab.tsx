@@ -175,24 +175,11 @@ export function DocumentosTab({
     }
   }, [refresh]);
 
-  const header = showHeader ? (
-    <div className="flex-shrink-0 border-b border-[#0D0D0D]/10 px-5 py-4">
-      <h3 className="text-base font-bold text-[#012340]">
-        Bandeja de documentos
-      </h3>
-      <p className="mt-0.5 truncate text-xs text-[#0D0D0D]/55">
-        {firmante.nombre ? (
-          <span className="font-medium text-[#0D0D0D]/70">{firmante.nombre}</span>
-        ) : null}
-        {firmante.nombre ? " · " : null}CC {cedula}
-      </p>
-    </div>
-  ) : null;
+
 
   if (loading) {
     return (
       <div className="flex h-full flex-col bg-white">
-        {header}
         <div className="min-h-0 flex-1">
           <LoadingScreen message="Cargando documentos" fullScreen={false} />
         </div>
@@ -203,7 +190,6 @@ export function DocumentosTab({
   if (error) {
     return (
       <div className="flex h-full flex-col bg-white">
-        {header}
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 text-center">
           <AlertCircle className="h-7 w-7 text-red-500" aria-hidden />
           <p className="max-w-[360px] text-sm text-[#0D0D0D]/55">{error}</p>
@@ -223,7 +209,6 @@ export function DocumentosTab({
 
   return (
     <div className="relative flex h-full flex-col bg-white">
-      {header}
 
       {docs.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-7 px-8 py-10">

@@ -32,12 +32,12 @@ import {
   STATUS_OPTIONS,
   STATUS_SUMMARY_ORDER,
   STAT_LABEL,
-  displayName,
   esEstadoDeSistema,
   fileExtLabel,
   fileUrl,
   formatDate,
   formatFileSize,
+  nombreLegible,
   type DocStatus,
   type Documento,
 } from "./utils";
@@ -84,6 +84,18 @@ function IconAction({
   );
 }
 
+/** Conteo por estado, en orden de avance y solo con los estados presentes. */
+function resumirEstados(docs: Documento[]) {
+  const counts = new Map<DocStatus, number>();
+  for (const doc of docs) {
+    counts.set(doc.estado, (counts.get(doc.estado) ?? 0) + 1);
+  }
+  return STATUS_SUMMARY_ORDER.filter((s) => counts.has(s)).map((s) => ({
+    status: s,
+    count: counts.get(s) ?? 0,
+  }));
+}
+
 /**
  * Solo los PDF fuera de un flujo de firma se pueden seleccionar: ZapSign firma
  * PDF y los documentos de sistema (`pendiente_firma`/`firmado`) ya están
@@ -114,16 +126,24 @@ const DocumentRow = memo(function DocumentRow({
   // En flujo de firma el servidor rechaza cambios y borrado (409): la UI lo
   // refleja mostrando el candado en lugar del menú de acciones.
   const bloqueado = esEstadoDeSistema(doc.estado);
+  const { texto, tecnico } = nombreLegible(doc.nombre);
 
   return (
     <li
-      className={`group flex items-center gap-3 overflow-hidden rounded-xl border border-[#0D0D0D]/10 bg-white pr-3 transition-all hover:border-[#012340]/25 hover:shadow-sm ${
+      className={`group relative flex items-center gap-1 border-b border-[#0D0D0D]/8 py-2.5 pl-9 pr-3 transition-colors last:border-b-0 hover:bg-[#012340]/[0.03] ${
         bloqueado ? "bg-[#012340]/[0.015]" : ""
       }`}
     >
+      {/* Acento de estado pegado al borde: así funciona como filo de la fila y
+          no como una barra suelta en medio del contenido. */}
+      <span
+        className={`absolute inset-y-0 left-0 w-[3px] ${STATUS_CONFIG[doc.estado].dot}`}
+        aria-hidden
+      />
+
       {/* Check de selección para el envío a firma (solo PDF fuera de flujo). */}
       <span
-        className="flex shrink-0 items-center pl-3"
+        className="flex shrink-0 items-center"
         title={
           seleccionable
             ? "Seleccionar para firmar"
@@ -138,28 +158,30 @@ const DocumentRow = memo(function DocumentRow({
         />
       </span>
 
-      {/* Acento de color: el estado se lee de un vistazo al recorrer la lista. */}
-      <span
-        className={`h-[52px] w-[3px] shrink-0 ${STATUS_CONFIG[doc.estado].dot}`}
-        aria-hidden
-      />
-
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#0D0D0D]/[0.03] ring-1 ring-inset ring-[#0D0D0D]/8">
+      {/* El ícono ya tiene forma propia: enmarcarlo sumaba una caja de más. */}
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center">
         <FileThumb contentType={doc.mimeType} />
       </span>
 
-      <div className="min-w-0 flex-1 py-2.5">
-        <p className="truncate text-sm font-semibold text-[#0D0D0D]/85">
-          {displayName(doc.nombre)}
+      <div className="min-w-0 flex-1">
+        <p
+          className={`truncate text-sm ${
+            tecnico
+              ? "font-mono text-[13px] font-medium text-[#0D0D0D]/55"
+              : "font-semibold text-[#0D0D0D]/85"
+          }`}
+          title={doc.nombre}
+        >
+          {texto}
         </p>
-        <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-[#0D0D0D]/45">
-          <span className="font-semibold text-[#0D0D0D]/55">
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-[#0D0D0D]/40">
+          <span className="font-semibold text-[#0D0D0D]/60">
             {fileExtLabel(doc.mimeType)}
           </span>
           <span aria-hidden>·</span>
-          <span>{formatFileSize(doc.sizeBytes)}</span>
+          <span className="tabular-nums">{formatFileSize(doc.sizeBytes)}</span>
           <span aria-hidden>·</span>
-          <span>{formatDate(doc.createdAt)}</span>
+          <span className="tabular-nums">{formatDate(doc.createdAt)}</span>
           {doc.subidoPor && (
             <>
               <span aria-hidden>·</span>
@@ -266,18 +288,6 @@ export function DocumentList({
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0], "es"));
   }, [docs]);
 
-  // Resumen por estado: solo los estados presentes, en orden de avance.
-  const resumen = useMemo(() => {
-    const counts = new Map<DocStatus, number>();
-    for (const doc of docs) {
-      counts.set(doc.estado, (counts.get(doc.estado) ?? 0) + 1);
-    }
-    return STATUS_SUMMARY_ORDER.filter((s) => counts.has(s)).map((s) => ({
-      status: s,
-      count: counts.get(s) ?? 0,
-    }));
-  }, [docs]);
-
   // Selección para firma: por id, solo sobre documentos seleccionables.
   const seleccionables = useMemo(() => docs.filter(puedeSeleccionarse), [docs]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -321,29 +331,16 @@ export function DocumentList({
     });
   }, []);
 
-  const enFirma = resumen.find((r) => r.status === "pendiente_firma")?.count ?? 0;
+  const enFirma = docs.filter((d) => d.estado === "pendiente_firma").length;
 
   return (
     <div className="flex h-full flex-col">
-      {/* Barra de resumen + acciones */}
+      {/* Barra de acciones. El desglose por estado vive en cada carpeta: ahí es
+          donde sirve, sobre todo con la carpeta cerrada. */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[#0D0D0D]/10 px-5 py-3">
         <p className="text-xs font-semibold text-[#0D0D0D]/70">
           {docs.length} {docs.length === 1 ? "documento" : "documentos"}
         </p>
-
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          {resumen.map(({ status, count }) => (
-            <span
-              key={status}
-              className="inline-flex items-center gap-1.5 text-xs text-[#0D0D0D]/50"
-            >
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${STATUS_CONFIG[status].dot}`}
-              />
-              {count} {STAT_LABEL[status]}
-            </span>
-          ))}
-        </div>
 
         {/* Deja claro que la vista se actualiza sola: sin esto el colaborador no
             sabe si tiene que recargar para ver la firma. */}
@@ -411,22 +408,22 @@ export function DocumentList({
 
       {/* Carpetas por tipo de documento (acordeón: se abren y se esconden). */}
       <div className="min-h-0 flex-1 overflow-auto px-5 py-4">
-        <div className="flex flex-col gap-4">
+        {/* Sin la caja de cada carpeta, lo que separa un grupo del siguiente es
+            el aire: por eso el salto es mayor que el de las filas. */}
+        <div className="flex flex-col gap-6">
           {grupos.map(([tipo, items]) => {
             const abierta = !(cerradas?.has(tipo) ?? false);
             const seleccionadosGrupo = items.filter((d) =>
               selectedIds.has(d.id),
             ).length;
+            const resumenGrupo = resumirEstados(items);
             return (
-              <section
-                key={tipo}
-                className="overflow-hidden rounded-xl border border-[#0D0D0D]/10 bg-[#012340]/[0.015]"
-              >
+              <section key={tipo}>
                 <button
                   type="button"
                   onClick={() => toggleGrupo(tipo)}
                   aria-expanded={abierta}
-                  className="flex w-full items-center gap-2.5 px-3.5 py-3 text-left transition-colors hover:bg-[#012340]/[0.04]"
+                  className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-[#012340]/[0.04]"
                 >
                   <Folder
                     className={cn(
@@ -441,6 +438,24 @@ export function DocumentList({
                   <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[#012340]/10 px-1.5 text-[10px] font-bold text-[#012340]">
                     {items.length}
                   </span>
+
+                  {/* Desglose por estado de esta carpeta. Se oculta en pantallas
+                      angostas para que el nombre no quede sin espacio. */}
+                  <span className="hidden shrink-0 items-center gap-x-3 md:flex">
+                    {resumenGrupo.map(({ status, count }) => (
+                      <span
+                        key={status}
+                        className="inline-flex items-center gap-1.5 text-[11px] text-[#0D0D0D]/45"
+                      >
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${STATUS_CONFIG[status].dot}`}
+                        />
+                        <span className="tabular-nums">{count}</span>{" "}
+                        {STAT_LABEL[status]}
+                      </span>
+                    ))}
+                  </span>
+
                   {seleccionadosGrupo > 0 && (
                     <span className="shrink-0 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">
                       {seleccionadosGrupo} seleccionado
@@ -457,7 +472,7 @@ export function DocumentList({
                 </button>
 
                 {abierta ? (
-                  <ul className="flex flex-col gap-2 border-t border-[#0D0D0D]/8 bg-white p-2.5">
+                  <ul className="mt-1 border-t border-[#0D0D0D]/8">
                     {items.map((doc) => (
                       <DocumentRow
                         key={doc.id}
@@ -470,22 +485,7 @@ export function DocumentList({
                       />
                     ))}
                   </ul>
-                ) : (
-                  <p className="border-t border-[#0D0D0D]/8 bg-white px-3.5 py-2 text-[11px] text-[#0D0D0D]/45">
-                    {items.length}{" "}
-                    {items.length === 1 ? "documento" : "documentos"}
-                    {seleccionadosGrupo > 0 && (
-                      <>
-                        {" "}
-                        ·{" "}
-                        <span className="font-semibold text-emerald-700">
-                          {seleccionadosGrupo} seleccionado
-                          {seleccionadosGrupo > 1 ? "s" : ""}
-                        </span>
-                      </>
-                    )}
-                  </p>
-                )}
+                ) : null}
               </section>
             );
           })}
